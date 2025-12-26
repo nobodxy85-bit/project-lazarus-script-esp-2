@@ -73,7 +73,7 @@ local function createZombieESP(zomb)
 			box.AlwaysOnTop = true
 			box.Transparency = 0.6
 			box.Color3 = Color3.fromRGB(255,0,0)
-			box.Parent = part
+			box.Parent = camera
 			table.insert(espObjects, box)
 		end
 	end
@@ -92,7 +92,7 @@ local function createBoxESP(boxModel)
 			box.AlwaysOnTop = true
 			box.Transparency = 0.5
 			box.Color3 = Color3.fromRGB(0,200,255)
-			box.Parent = part
+			box.Parent = camera
 			table.insert(espObjects, box)
 		end
 	end
@@ -229,3 +229,4 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
