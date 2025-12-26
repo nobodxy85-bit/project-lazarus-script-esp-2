@@ -4,11 +4,11 @@
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
-
-local player = Players.LocalPlayer
 
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
@@ -229,4 +229,5 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
 
