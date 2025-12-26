@@ -14,6 +14,7 @@ local ALERT_DISTANCE = 20
 local ZOMBIE_ESP_DISTANCE = 120
 local enabled = false
 local espObjects = {}
+local firstTime = true
 
 -- PATH
 local pathParts = {}
@@ -35,6 +36,18 @@ AlertText.Font = Enum.Font.GothamBold
 AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
+
+-- ===== MENSAJE INICIAL =====
+local StartText = Instance.new("TextLabel")
+StartText.Size = UDim2.new(0, 520, 0, 50)
+StartText.Position = UDim2.new(0.5, -260, 0.18, 0)
+StartText.BackgroundTransparency = 1
+StartText.Text = 'push"T" to enable hacks'
+StartText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartText.Font = Enum.Font.GothamBold
+StartText.TextSize = 28
+StartText.Visible = true
+StartText.Parent = ScreenGui
 
 -- ===== ESP ZOMBIES =====
 local function createZombieESP(model)
@@ -225,15 +238,22 @@ end)
 
 -- ===== TECLA T =====
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == Enum.KeyCode.T then
-		enabled = not enabled
-		if enabled then
-			enableAllESP()
-		else
-			removeESP()
-			clearPath()
-			AlertText.Visible = false
-		end
-	end
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        enabled = not enabled
+
+        if firstTime then
+            StartText.Visible = false
+            firstTime = false
+        end
+
+        if enabled then
+            enableAllESP()
+        else
+            removeESP()
+            AlertText.Visible = false
+        end
+    end
 end)
+
+
