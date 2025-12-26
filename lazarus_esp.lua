@@ -1,8 +1,6 @@
--- ====================================================================
--- ESP ZOMBIES + ESP MYSTERY BOX + PATHFIND + ALERTA
--- ESTO ES UN SCRIPT NO DISEÑADO PARA MOLESTAR SIMPLEMENTE ES EDUCATIVO
--- Creador = Nobodxy
--- ====================================================================
+-- ======================================================
+-- ESP ZOMBIES + ESP CAJA + PATHFIND + ALERTA (ESTABLE)
+-- ======================================================
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -15,12 +13,16 @@ local player = Players.LocalPlayer
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
 local ZOMBIE_ESP_DISTANCE = 120
+local ESP_UPDATE_DELAY = 0.3
+local PATH_UPDATE_DELAY = 0.5
 
 -- ===== ESTADO =====
 local enabled = false
 local espObjects = {}
 local pathParts = {}
 local currentBox = nil
+local lastESPUpdate = 0
+local lastPathTime = 0
 
 -- ======================================================
 -- GUI ALERTA
@@ -50,10 +52,8 @@ local function clearPath()
 end
 
 local function removeESP()
-	for _, obj in ipairs(espObjects) do
-		if obj and obj.Parent then
-			obj:Destroy()
-		end
+	for _, e in ipairs(espObjects) do
+		if e and e.Parent then e:Destroy() end
 	end
 	table.clear(espObjects)
 	clearPath()
@@ -61,20 +61,9 @@ local function removeESP()
 end
 
 -- ======================================================
--- ESP ZOMBIES (ROJO CON LÍMITE)
+-- ESP ZOMBIES (ROJO)
 -- ======================================================
 local function createZombieESP(zomb)
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local root = zomb:FindFirstChild("HumanoidRootPart") or zomb:FindFirstChild("Torso")
-	if not root then return end
-
-	if (hrp.Position - root.Position).Magnitude > ZOMBIE_ESP_DISTANCE then
-		return
-	end
-
 	for _, part in ipairs(zomb:GetChildren()) do
 		if part:IsA("BasePart") and not part:FindFirstChild("ESP_Box") then
 			local box = Instance.new("BoxHandleAdornment")
@@ -110,7 +99,7 @@ local function createBoxESP(boxModel)
 end
 
 -- ======================================================
--- PATHFIND A LA CAJA
+-- PATHFIND A LA CAJA (ESTABLE)
 -- ======================================================
 local function drawPathToBox(boxModel)
 	clearPath()
@@ -150,7 +139,6 @@ end
 -- ACTIVAR ESP
 -- ======================================================
 local function enableAllESP()
-	-- Zombies
 	local baddies = workspace:FindFirstChild("Baddies")
 	if baddies then
 		for _, z in ipairs(baddies:GetChildren()) do
@@ -158,7 +146,6 @@ local function enableAllESP()
 		end
 	end
 
-	-- Mystery Box (ruta que dijiste)
 	local interact = workspace:FindFirstChild("Interact")
 	if interact then
 		for _, obj in ipairs(interact:GetChildren()) do
@@ -171,36 +158,11 @@ local function enableAllESP()
 end
 
 -- ======================================================
--- EVENTOS DINÁMICOS
--- ======================================================
-local baddies = workspace:FindFirstChild("Baddies")
-if baddies then
-	baddies.ChildAdded:Connect(function(z)
-		task.wait(0.3)
-		if enabled then
-			createZombieESP(z)
-		end
-	end)
-end
-
-local interact = workspace:FindFirstChild("Interact")
-if interact then
-	interact.ChildAdded:Connect(function(obj)
-		task.wait(0.2)
-		if enabled and obj.Name == "MysteryBox" then
-			currentBox = obj
-			createBoxESP(obj)
-		end
-	end)
-end
-
--- ======================================================
--- LOOP PRINCIPAL
+-- LOOP PRINCIPAL (TODO AQUÍ)
 -- ======================================================
 RunService.RenderStepped:Connect(function()
 	if not enabled then
 		AlertText.Visible = false
-		clearPath()
 		return
 	end
 
@@ -209,18 +171,27 @@ RunService.RenderStepped:Connect(function()
 	local baddies = workspace:FindFirstChild("Baddies")
 	if not hrp or not baddies then return end
 
-	-- Limpieza ESP lejanos
-	for _, z in ipairs(baddies:GetChildren()) do
-		local root = z:FindFirstChild("HumanoidRootPart") or z:FindFirstChild("Torso")
-		if root and (hrp.Position - root.Position).Magnitude > ZOMBIE_ESP_DISTANCE then
-			for _, p in ipairs(z:GetChildren()) do
-				local esp = p:FindFirstChild("ESP_Box")
-				if esp then esp:Destroy() end
+	-- ===== ESP ZOMBIES CONTROLADO =====
+	if tick() - lastESPUpdate >= ESP_UPDATE_DELAY then
+		lastESPUpdate = tick()
+
+		for _, z in ipairs(baddies:GetChildren()) do
+			local root = z:FindFirstChild("HumanoidRootPart") or z:FindFirstChild("Torso")
+			if root then
+				local dist = (hrp.Position - root.Position).Magnitude
+				if dist <= ZOMBIE_ESP_DISTANCE then
+					createZombieESP(z)
+				else
+					for _, p in ipairs(z:GetChildren()) do
+						local esp = p:FindFirstChild("ESP_Box")
+						if esp then esp:Destroy() end
+					end
+				end
 			end
 		end
 	end
 
-	-- Alerta
+	-- ===== ALERTA =====
 	local count = 0
 	for _, z in ipairs(baddies:GetChildren()) do
 		local root = z:FindFirstChild("HumanoidRootPart") or z:FindFirstChild("Torso")
@@ -236,8 +207,9 @@ RunService.RenderStepped:Connect(function()
 		AlertText.Visible = false
 	end
 
-	-- Path a la caja
-	if currentBox then
+	-- ===== PATHFIND CAJA =====
+	if currentBox and tick() - lastPathTime >= PATH_UPDATE_DELAY then
+		lastPathTime = tick()
 		drawPathToBox(currentBox)
 	end
 end)
