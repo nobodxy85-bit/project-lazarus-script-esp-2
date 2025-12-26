@@ -1,6 +1,4 @@
--- ======================================================
--- ESP ZOMBIES + ESP CAJA + PATHFIND + ALERTA (REDISEÑO)
--- ======================================================
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PATHFIND AZUL (ACTUALIZA CADA FRAME)
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -9,26 +7,14 @@ local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
 
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
 
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
-local ZOMBIE_ESP_DISTANCE = 120
-local PATH_UPDATE_DELAY = 0.6
-local ESP_UPDATE_DELAY = 0.4
-
--- ===== ESTADO =====
 local enabled = false
-local zombieESP = {}   -- [zombie] = {adornments}
-local boxESP = {}
-local pathParts = {}
-local currentBox = nil
-local lastPath = 0
-local lastESP = 0
+local espObjects = {}
+local pathLines = {}
 
--- ======================================================
--- GUI ALERTA
--- ======================================================
+-- ===== GUI ALERTA =====
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
@@ -43,211 +29,173 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- ======================================================
--- UTILIDADES
--- ======================================================
-local function clearTable(t)
-	for _, v in pairs(t) do
-		if typeof(v) == "table" then
-			for _, o in ipairs(v) do
-				if o then o:Destroy() end
-			end
-		elseif typeof(v) == "Instance" then
-			v:Destroy()
-		end
-	end
-	table.clear(t)
-end
+-- ===== FUNCIONES ESP =====
+local function addBox(part, color, transparency)
+    if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
 
-local function clearPath()
-	clearTable(pathParts)
-end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "ESP_Box"
+    box.Adornee = part
+    box.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Transparency = transparency
+    box.Color3 = color
+    box.Parent = part
 
--- ======================================================
--- ESP ZOMBIES (ROJO - LIMPIO)
--- ======================================================
-local function removeZombieESP(zombie)
-	if zombieESP[zombie] then
-		for _, box in ipairs(zombieESP[zombie]) do
-			if box then box:Destroy() end
-		end
-		zombieESP[zombie] = nil
-	end
+    table.insert(espObjects, box)
 end
 
 local function createZombieESP(zombie)
-	if zombieESP[zombie] then return end
-
-	local humanoid = zombie:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then return end
-
-	local partsESP = {}
-
-	for _, part in ipairs(zombie:GetDescendants()) do
-		if part:IsA("BasePart") then
-			local box = Instance.new("BoxHandleAdornment")
-			box.Adornee = part
-			box.Size = part.Size + Vector3.new(0.1,0.1,0.1)
-			box.AlwaysOnTop = true
-			box.ZIndex = 10
-			box.Transparency = 0.5
-			box.Color3 = Color3.fromRGB(255,0,0)
-			box.Parent = camera
-			table.insert(partsESP, box)
-		end
-	end
-
-	zombieESP[zombie] = partsESP
-
-	-- 🔥 LIMPIEZA AUTOMÁTICA AL MORIR
-	humanoid.Died:Once(function()
-		removeZombieESP(zombie)
-	end)
-
-	zombie.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			removeZombieESP(zombie)
-		end
-	end)
+    for _, part in ipairs(zombie:GetChildren()) do
+        addBox(part, Color3.fromRGB(255, 0, 0), 0.6)
+    end
 end
 
--- ======================================================
--- ESP MYSTERY BOX (AZUL)
--- ======================================================
-local function clearBoxESP()
-	clearTable(boxESP)
-	currentBox = nil
-	clearPath()
+local function createMysteryESP(box)
+    for _, part in ipairs(box:GetDescendants()) do
+        addBox(part, Color3.fromRGB(0, 200, 255), 0.45)
+    end
 end
 
-local function createBoxESP(boxModel)
-	clearBoxESP()
-	currentBox = boxModel
-
-	for _, part in ipairs(boxModel:GetDescendants()) do
-		if part:IsA("BasePart") then
-			local box = Instance.new("BoxHandleAdornment")
-			box.Adornee = part
-			box.Size = part.Size + Vector3.new(0.2,0.2,0.2)
-			box.AlwaysOnTop = true
-			box.ZIndex = 12
-			box.Transparency = 0.4
-			box.Color3 = Color3.fromRGB(0,200,255)
-			box.Parent = camera
-			table.insert(boxESP, box)
-		end
-	end
-
-	boxModel.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			clearBoxESP()
-		end
-	end)
+local function clearAll()
+    for _, obj in ipairs(espObjects) do
+        if obj then obj:Destroy() end
+    end
+    for _, line in ipairs(pathLines) do
+        if line then line:Destroy() end
+    end
+    table.clear(espObjects)
+    table.clear(pathLines)
 end
 
--- ======================================================
--- PATHFIND A LA CAJA
--- ======================================================
-local function drawPath()
-	if not currentBox then return end
-	clearPath()
+-- ===== PATHFIND AZUL =====
+local function drawPath(targetPos)
+    -- limpiar path anterior
+    for _, l in ipairs(pathLines) do
+        l:Destroy()
+    end
+    table.clear(pathLines)
 
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-	local target = currentBox:FindFirstChildWhichIsA("BasePart", true)
-	if not target then return end
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    })
 
-	local path = PathfindingService:CreatePath()
-	path:ComputeAsync(hrp.Position, target.Position)
-	if path.Status ~= Enum.PathStatus.Success then return end
+    path:ComputeAsync(hrp.Position, targetPos)
+    if path.Status ~= Enum.PathStatus.Success then return end
 
-	for _, wp in ipairs(path:GetWaypoints()) do
-		local p = Instance.new("Part")
-		p.Size = Vector3.new(0.4,0.4,0.4)
-		p.Shape = Enum.PartType.Ball
-		p.Anchored = true
-		p.CanCollide = false
-		p.Material = Enum.Material.Neon
-		p.Color = Color3.fromRGB(0,200,255)
-		p.Position = wp.Position + Vector3.new(0,0.2,0)
-		p.Parent = workspace
-		table.insert(pathParts, p)
-	end
+    local waypoints = path:GetWaypoints()
+    for i = 1, #waypoints - 1 do
+        local p0 = waypoints[i].Position
+        local p1 = waypoints[i + 1].Position
+        local dist = (p0 - p1).Magnitude
+
+        local part = Instance.new("Part")
+        part.Anchored = true
+        part.CanCollide = false
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(0, 150, 255) -- 🔵 AZUL
+        part.Size = Vector3.new(0.22, 0.22, dist)
+        part.CFrame = CFrame.lookAt((p0 + p1) / 2, p1)
+        part.Parent = workspace
+
+        table.insert(pathLines, part)
+    end
 end
 
--- ======================================================
--- LOOP PRINCIPAL (OPTIMIZADO)
--- ======================================================
-RunService.Heartbeat:Connect(function()
-	if not enabled then return end
+-- ===== MYSTERY BOX MÁS CERCANA =====
+local function getNearestMysteryBox()
+    local interact = workspace:FindFirstChild("Interact")
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not interact or not hrp then return end
 
-	local now = tick()
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not hrp or not baddies then return end
+    local nearest, dist = nil, math.huge
+    for _, obj in ipairs(interact:GetChildren()) do
+        if obj.Name == "MysteryBox" then
+            local part = obj:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local d = (hrp.Position - part.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    nearest = part
+                end
+            end
+        end
+    end
+    return nearest
+end
 
-	-- ===== ESP ZOMBIES POR DISTANCIA =====
-	if now - lastESP >= ESP_UPDATE_DELAY then
-		lastESP = now
+-- ===== ACTIVAR ESP =====
+local function enableESP()
+    local baddies = workspace:FindFirstChild("Baddies")
+    if baddies then
+        for _, z in ipairs(baddies:GetChildren()) do
+            createZombieESP(z)
+        end
+    end
 
-		for _, z in ipairs(baddies:GetChildren()) do
-			local root = z:FindFirstChild("HumanoidRootPart")
-			if root then
-				local dist = (hrp.Position - root.Position).Magnitude
-				if dist <= ZOMBIE_ESP_DISTANCE then
-					createZombieESP(z)
-				else
-					removeZombieESP(z)
-				end
-			end
-		end
-	end
+    local interact = workspace:FindFirstChild("Interact")
+    if interact then
+        for _, obj in ipairs(interact:GetChildren()) do
+            if obj.Name == "MysteryBox" then
+                createMysteryESP(obj)
+            end
+        end
+    end
+end
 
-	-- ===== ALERTA =====
-	local count = 0
-	for _, z in ipairs(baddies:GetChildren()) do
-		local root = z:FindFirstChild("HumanoidRootPart")
-		if root and (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
-			count += 1
-		end
-	end
+-- ===== ALERTA + PATH (CADA FRAME) =====
+RunService.RenderStepped:Connect(function()
+    if not enabled then
+        AlertText.Visible = false
+        return
+    end
 
-	AlertText.Visible = count > 0
-	if count > 0 then
-		AlertText.Text = "⚠ ZOMBIE CERCA (x"..count..")"
-	end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local baddies = workspace:FindFirstChild("Baddies")
+    if not hrp or not baddies then return end
 
-	-- ===== PATH =====
-	if currentBox and now - lastPath >= PATH_UPDATE_DELAY then
-		lastPath = now
-		drawPath()
-	end
+    -- alerta zombies
+    local count = 0
+    for _, z in ipairs(baddies:GetChildren()) do
+        local root = z:FindFirstChild("HumanoidRootPart")
+        if root and (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
+            count += 1
+        end
+    end
+
+    if count > 0 then
+        AlertText.Text = "⚠ ZOMBIE CERCA (x" .. count .. ")"
+        AlertText.Visible = true
+    else
+        AlertText.Visible = false
+    end
+
+    -- path a la caja
+    local box = getNearestMysteryBox()
+    if box then
+        drawPath(box.Position) -- 🔁 cada frame
+    end
 end)
 
--- ======================================================
--- TECLAS
--- ======================================================
+-- ===== TECLA T =====
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-
-	if input.KeyCode == Enum.KeyCode.T then
-		enabled = not enabled
-		if not enabled then
-			clearTable(zombieESP)
-			clearBoxESP()
-			AlertText.Visible = false
-		end
-	end
-
-	-- PANIC
-	if input.KeyCode == Enum.KeyCode.X then
-		clearTable(zombieESP)
-		clearBoxESP()
-		clearPath()
-		ScreenGui:Destroy()
-		script:Destroy()
-	end
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        enabled = not enabled
+        if enabled then
+            enableESP()
+        else
+            clearAll()
+            AlertText.Visible = false
+        end
+    end
 end)
