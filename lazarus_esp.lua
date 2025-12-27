@@ -55,7 +55,7 @@ EnabledText.Position = StartText.Position
 EnabledText.BackgroundTransparency = 0.7
 EnabledText.Text = "Creator = Nobodxy85-bit  :D"
 
-EnabledText.TextColor3 = Color3.new(0, 0, 0) -- NEGRO REAL
+EnabledText.TextColor3 = Color3.new(255, 255, 255) -- NEGRO REAL
 EnabledText.TextTransparency = 0.9
 
 EnabledText.TextStrokeTransparency = 0.7 
@@ -197,8 +197,8 @@ UserInputService.InputBegan:Connect(function(input, gp)
 			EnabledText.TextTransparency = 0
 
 			task.spawn(function()
-				task.wait(0.5)
-				fadeOut(EnabledText, 1.5)
+				task.wait(3)
+				fadeOut(EnabledText, 2)
 			end)
 
 			firstTime = false
@@ -212,6 +212,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
 
 
 
