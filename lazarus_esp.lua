@@ -48,16 +48,21 @@ StartText.Font = Enum.Font.GothamBold
 StartText.TextSize = 20
 StartText.Parent = ScreenGui
 
--- TEXTO ENABLED (FADE)
+-- TEXTO ENABLED (FADE) - NEGRO FORZADO
 local EnabledText = Instance.new("TextLabel")
 EnabledText.Size = StartText.Size
 EnabledText.Position = StartText.Position
-EnabledText.BackgroundTransparency = 0.7
+EnabledText.BackgroundTransparency = 1
 EnabledText.Text = "Creator = Nobodxy85-bit"
-EnabledText.TextColor3 = Color3.fromRGB(0, 0, 0)
+
+EnabledText.TextColor3 = Color3.new(0, 0, 0) -- NEGRO REAL
+EnabledText.TextTransparency = 1
+
+EnabledText.TextStrokeTransparency = 0.7 
+EnabledText.RichText = false
+
 EnabledText.Font = Enum.Font.GothamBold
 EnabledText.TextSize = 22
-EnabledText.TextTransparency = 1
 EnabledText.Visible = false
 EnabledText.Parent = ScreenGui
 
@@ -207,4 +212,5 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
 
