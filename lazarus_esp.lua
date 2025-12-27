@@ -20,7 +20,7 @@ local firstTime = true
 local pathParts = {}
 local currentBox = nil
 local lastPathUpdate = 0
-local PATH_UPDATE_DELAY = 0.6
+local PATH_UPDATE_DELAY = 0.3
 
 -- ===== GUI TEXTO =====
 local ScreenGui = Instance.new("ScreenGui")
@@ -143,7 +143,7 @@ local function drawPathToBox()
 		beam.CanCollide = false
 		beam.Material = Enum.Material.Neon
 		beam.Color = Color3.fromRGB(0, 200, 255)
-		beam.Size = Vector3.new(0.25, 0.25, dist)
+		beam.Size = Vector3.new(0.1, 0.1, dist)
 		beam.CFrame = CFrame.new(a, b) * CFrame.new(0, 0, -dist / 2)
 		beam.Parent = workspace
 
@@ -255,6 +255,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
 end)
+
 
 
 
