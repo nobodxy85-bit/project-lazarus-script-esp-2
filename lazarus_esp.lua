@@ -1,26 +1,25 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
 -- Creator = Nobodxy85-bit
+
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
+local AIM_FOV = 30 -- radio en pixeles
 local enabled = false
-local firstTime = true
-local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
-local AIM_FOV = 30 -- radio en pixeles (más bajo = más preciso)
+local firstTime = true
 
--- caches
+-- ===== CACHES ESP (NO TOCAR) =====
 local espObjects = {}
 local cachedZombies = {}
 local cachedBoxes = {}
-
--- connections
 local zombieAddedConnection
 
 -- ===== GUI =====
@@ -28,7 +27,6 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
--- ALERTA
 local AlertText = Instance.new("TextLabel")
 AlertText.Size = UDim2.new(0, 360, 0, 50)
 AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
@@ -39,36 +37,29 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- TEXTO INICIAL (MAS ARRIBA)
 local StartText = Instance.new("TextLabel")
 StartText.Size = UDim2.new(0, 520, 0, 40)
 StartText.Position = UDim2.new(0.5, -260, 0.10, 0)
 StartText.BackgroundTransparency = 0.7
-StartText.Text = 'Push "T" to enable HACKS'
+StartText.Text = 'Push "T" to enable ESP AND PUSH "C" to enable AIMBOT'
 StartText.TextColor3 = Color3.fromRGB(0, 0, 0)
 StartText.Font = Enum.Font.GothamBold
 StartText.TextSize = 20
 StartText.Parent = ScreenGui
 
--- TEXTO ENABLED (FADE) - NEGRO FORZADO
 local EnabledText = Instance.new("TextLabel")
 EnabledText.Size = StartText.Size
 EnabledText.Position = StartText.Position
 EnabledText.BackgroundTransparency = 0.7
-EnabledText.Text = "Creator = Nobodxy85-bit  :D"
-
-EnabledText.TextColor3 = Color3.new(255, 255, 255) -- NEGRO REAL
-EnabledText.TextTransparency = 0.9
-
-EnabledText.TextStrokeTransparency = 0.7 
-EnabledText.RichText = false
-
+EnabledText.Text = "Creator = Nobodxy85-bit :D"
+EnabledText.TextColor3 = Color3.new(0, 0, 0)
+EnabledText.TextTransparency = 0
 EnabledText.Font = Enum.Font.GothamBold
 EnabledText.TextSize = 20
 EnabledText.Visible = false
 EnabledText.Parent = ScreenGui
 
--- ===== FUNCION FADE =====
+-- ===== FADE =====
 local function fadeOut(label, duration)
 	local steps = 30
 	for i = 0, steps do
@@ -78,33 +69,31 @@ local function fadeOut(label, duration)
 	label.Visible = false
 end
 
-local function getClosestZombieToCursor()
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not baddies then return end
+-- ======================================================
+-- ================== AIMBOT (NUEVO) ====================
+-- ======================================================
 
-	local closest, shortest = nil, AIM_FOV
-	local mousePos = UserInputService:GetMouseLocation()
+-- VISIBILIDAD (NO PAREDES)
+local function isVisible(head, zombie)
+	local origin = Camera.CFrame.Position
+	local direction = head.Position - origin
 
-	for _, z in ipairs(baddies:GetChildren()) do
-		local hrp = z:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-			if onScreen then
-				local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-				if dist < shortest then
-					shortest = dist
-					closest = hrp
-				end
-			end
-		end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+	params.FilterDescendantsInstances = {player.Character, zombie}
+	params.IgnoreWater = true
+
+	local result = workspace:Raycast(origin, direction, params)
+	if result then
+		return result.Instance:IsDescendantOf(zombie)
 	end
-
-	return closest
+	return true
 end
 
+-- ZOMBIE MAS CERCANO AL CURSOR (CABEZA + FOV)
 local function getClosestZombieToCursor()
 	local closest = nil
-	local shortest = math.huge
+	local shortest = AIM_FOV
 	local mousePos = UserInputService:GetMouseLocation()
 
 	local baddies = workspace:FindFirstChild("Baddies")
@@ -118,7 +107,7 @@ local function getClosestZombieToCursor()
 			local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 			if onScreen then
 				local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-				if dist < shortest then
+				if dist <= shortest and isVisible(head, z) then
 					shortest = dist
 					closest = head
 				end
@@ -129,7 +118,10 @@ local function getClosestZombieToCursor()
 	return closest
 end
 
--- ===== ESP =====
+-- ======================================================
+-- ======================= ESP ==========================
+-- ======================================================
+
 local function addBox(part, color, transparency)
 	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
 
@@ -164,33 +156,27 @@ local function createBoxESP(box)
 	end
 end
 
--- ===== LIMPIAR =====
 local function clearAll()
 	for _, obj in ipairs(espObjects) do
 		if obj then obj:Destroy() end
 	end
-
 	if zombieAddedConnection then
 		zombieAddedConnection:Disconnect()
 		zombieAddedConnection = nil
 	end
-
 	table.clear(espObjects)
 	table.clear(cachedZombies)
 	table.clear(cachedBoxes)
 end
 
--- ===== ACTIVAR ESP =====
 local function enableESP()
 	local baddies = workspace:FindFirstChild("Baddies")
 	if not baddies then return end
 
-	-- zombies actuales
 	for _, z in ipairs(baddies:GetChildren()) do
 		createZombieESP(z)
 	end
 
-	-- zombies nuevos
 	zombieAddedConnection = baddies.ChildAdded:Connect(function(zombie)
 		task.wait(0.1)
 		if enabled then
@@ -198,7 +184,6 @@ local function enableESP()
 		end
 	end)
 
-	-- mystery box
 	local interact = workspace:FindFirstChild("Interact")
 	if interact then
 		for _, obj in ipairs(interact:GetChildren()) do
@@ -209,8 +194,12 @@ local function enableESP()
 	end
 end
 
+-- ======================================================
+-- ================== RENDERSTEPPED =====================
+-- ======================================================
+
 RunService.RenderStepped:Connect(function()
-	-- ===== ALERTA ZOMBIES =====
+	-- ALERTA
 	if not enabled then
 		AlertText.Visible = false
 	else
@@ -220,11 +209,9 @@ RunService.RenderStepped:Connect(function()
 
 		if hrp and baddies then
 			local count = 0
-
 			for _, z in ipairs(baddies:GetChildren()) do
 				local root = z:FindFirstChild("HumanoidRootPart")
 				local humanoid = z:FindFirstChildOfClass("Humanoid")
-
 				if root and humanoid and humanoid.Health > 0 then
 					if (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
 						count += 1
@@ -241,35 +228,32 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- ===== AIMBOT (CABEZA) =====
+	-- AIMBOT
 	if aimbotEnabled then
 		local head = getClosestZombieToCursor()
 		if head then
-			Camera.CFrame = CFrame.new(
-				Camera.CFrame.Position,
-				head.Position
-			)
+			Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
 		end
 	end
 end)
 
+-- ======================================================
+-- ======================= INPUT ========================
+-- ======================================================
+
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
-	-- ===== TECLA T (ESP) =====
 	if input.KeyCode == Enum.KeyCode.T then
 		enabled = not enabled
 
 		if firstTime then
 			StartText.Visible = false
 			EnabledText.Visible = true
-			EnabledText.TextTransparency = 0
-
 			task.spawn(function()
 				task.wait(3)
 				fadeOut(EnabledText, 2)
 			end)
-
 			firstTime = false
 		end
 
@@ -281,12 +265,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 
-	-- ===== TECLA C (AIMBOT) =====
 	if input.KeyCode == Enum.KeyCode.C then
 		aimbotEnabled = not aimbotEnabled
 	end
 end)
-
-
-
-
