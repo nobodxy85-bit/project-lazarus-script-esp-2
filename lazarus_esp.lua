@@ -11,6 +11,9 @@ local player = Players.LocalPlayer
 local ALERT_DISTANCE = 20
 local enabled = false
 local firstTime = true
+local Camera = workspace.CurrentCamera
+local aimbotEnabled = false
+local AIM_FOV = 160 -- radio en pixeles (más bajo = más preciso)
 
 -- caches
 local espObjects = {}
@@ -73,6 +76,30 @@ local function fadeOut(label, duration)
 		task.wait(duration / steps)
 	end
 	label.Visible = false
+end
+
+local function getClosestZombieToCursor()
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+
+	local closest, shortest = nil, AIM_FOV
+	local mousePos = UserInputService:GetMouseLocation()
+
+	for _, z in ipairs(baddies:GetChildren()) do
+		local hrp = z:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+			if onScreen then
+				local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+				if dist < shortest then
+					shortest = dist
+					closest = hrp
+				end
+			end
+		end
+	end
+
+	return closest
 end
 
 -- ===== ESP =====
@@ -155,43 +182,54 @@ local function enableESP()
 	end
 end
 
--- ===== LOOP ALERTA =====
 RunService.RenderStepped:Connect(function()
+	-- ===== ESP / ALERTA =====
 	if not enabled then
 		AlertText.Visible = false
-		return
-	end
+	else
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local baddies = workspace:FindFirstChild("Baddies")
 
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not hrp or not baddies then return end
+		if hrp and baddies then
+			local count = 0
+			for _, z in ipairs(baddies:GetChildren()) do
+				local root = z:FindFirstChild("HumanoidRootPart")
+				if root and (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
+					count += 1
+				end
+			end
 
-	local count = 0
-	for _, z in ipairs(baddies:GetChildren()) do
-		local root = z:FindFirstChild("HumanoidRootPart")
-		if root and (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
-			count += 1
+			if count > 0 then
+				AlertText.Text = "⚠ ZOMBIE CERCA (x" .. count .. ")"
+				AlertText.Visible = true
+			else
+				AlertText.Visible = false
+			end
 		end
 	end
 
-	if count > 0 then
-		AlertText.Text = "⚠ ZOMBIE CERCA (x" .. count .. ")"
-		AlertText.Visible = true
-	else
-		AlertText.Visible = false
+	-- ===== AIMBOT =====
+	if aimbotEnabled then
+		local target = getClosestZombieToCursor()
+		if target then
+			Camera.CFrame = CFrame.new(
+				Camera.CFrame.Position,
+				target.Position
+			)
+		end
 	end
 end)
 
--- ===== TECLA T =====
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
+
+	-- ===== TECLA T (ESP) =====
 	if input.KeyCode == Enum.KeyCode.T then
 		enabled = not enabled
 
 		if firstTime then
 			StartText.Visible = false
-
 			EnabledText.Visible = true
 			EnabledText.TextTransparency = 0
 
@@ -210,9 +248,11 @@ UserInputService.InputBegan:Connect(function(input, gp)
 			AlertText.Visible = false
 		end
 	end
+
+	-- ===== TECLA C (AIMBOT) =====
+	if input.KeyCode == Enum.KeyCode.C then
+		aimbotEnabled = not aimbotEnabled
+	end
 end)
-
-
-
 
 
