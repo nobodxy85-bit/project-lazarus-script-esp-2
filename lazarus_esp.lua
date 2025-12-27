@@ -41,11 +41,11 @@ AlertText.Parent = ScreenGui
 local StartText = Instance.new("TextLabel")
 StartText.Size = UDim2.new(0, 520, 0, 50)
 StartText.Position = UDim2.new(0.5, -260, 0.18, 0)
-StartText.BackgroundTransparency = 1
-StartText.Text = 'push"T" to enable hacks'
-StartText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartText.BackgroundTransparency = 0.7
+StartText.Text = 'Push "T" to enable HACKS'
+StartText.TextColor3 = Color3.fromRGB(0, 0, 0)
 StartText.Font = Enum.Font.GothamBold
-StartText.TextSize = 28
+StartText.TextSize = 20
 StartText.Visible = true
 StartText.Parent = ScreenGui
 
@@ -255,5 +255,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
 end)
+
 
 
