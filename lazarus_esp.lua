@@ -1,5 +1,5 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- ESP SE APLICA A ZOMBIES NUEVOS AUTOMÁTICAMENTE
+-- UI: TEXTO ARRIBA + TEXTO FADE (ESP NO TOCADO)
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -37,16 +37,39 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- TEXTO INICIO
+-- TEXTO INICIAL (MAS ARRIBA)
 local StartText = Instance.new("TextLabel")
 StartText.Size = UDim2.new(0, 520, 0, 40)
-StartText.Position = UDim2.new(0.5, -260, 0.18, 0)
+StartText.Position = UDim2.new(0.5, -260, 0.10, 0)
 StartText.BackgroundTransparency = 0.7
 StartText.Text = 'Push "T" to enable HACKS'
-StartText.TextColor3 = Color3.fromRGB(0,0,0)
+StartText.TextColor3 = Color3.fromRGB(0, 0, 0)
 StartText.Font = Enum.Font.GothamBold
-	StartText.TextSize = 20
+StartText.TextSize = 20
 StartText.Parent = ScreenGui
+
+-- TEXTO ENABLED (FADE)
+local EnabledText = Instance.new("TextLabel")
+EnabledText.Size = StartText.Size
+EnabledText.Position = StartText.Position
+EnabledText.BackgroundTransparency = 1
+EnabledText.Text = "Creator = Nobodxy85-bit"
+EnabledText.TextColor3 = Color3.fromRGB(0, 200, 0)
+EnabledText.Font = Enum.Font.GothamBold
+EnabledText.TextSize = 22
+EnabledText.TextTransparency = 1
+EnabledText.Visible = false
+EnabledText.Parent = ScreenGui
+
+-- ===== FUNCION FADE =====
+local function fadeOut(label, duration)
+	local steps = 30
+	for i = 0, steps do
+		label.TextTransparency = i / steps
+		task.wait(duration / steps)
+	end
+	label.Visible = false
+end
 
 -- ===== ESP =====
 local function addBox(part, color, transparency)
@@ -104,7 +127,7 @@ local function enableESP()
 	local baddies = workspace:FindFirstChild("Baddies")
 	if not baddies then return end
 
-	-- zombies existentes
+	-- zombies actuales
 	for _, z in ipairs(baddies:GetChildren()) do
 		createZombieESP(z)
 	end
@@ -164,6 +187,15 @@ UserInputService.InputBegan:Connect(function(input, gp)
 
 		if firstTime then
 			StartText.Visible = false
+
+			EnabledText.Visible = true
+			EnabledText.TextTransparency = 0
+
+			task.spawn(function()
+				task.wait(0.5)
+				fadeOut(EnabledText, 1.5)
+			end)
+
 			firstTime = false
 		end
 
