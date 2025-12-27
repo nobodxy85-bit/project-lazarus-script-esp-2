@@ -1,32 +1,28 @@
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PATHFIND AZUL CON BEAM
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA (HUD LIMPIO / OPTIMIZADO)
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local PathfindingService = game:GetService("PathfindingService")
 
 local player = Players.LocalPlayer
 
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
 local enabled = false
-local espObjects = {}
 local firstTime = true
 
--- ===== BEAM PATH =====
-local beamFolder = Instance.new("Folder")
-beamFolder.Name = "PathBeam"
-beamFolder.Parent = workspace
-
-local attachments = {}
-local beams = {}
+-- caches
+local espObjects = {}
+local cachedZombies = {}
+local cachedBoxes = {}
 
 -- ===== GUI =====
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- ALERTA
 local AlertText = Instance.new("TextLabel")
 AlertText.Size = UDim2.new(0, 360, 0, 50)
 AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
@@ -37,18 +33,18 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
+-- TEXTO INICIO
 local StartText = Instance.new("TextLabel")
-StartText.Size = UDim2.new(0, 520, 0, 50)
+StartText.Size = UDim2.new(0, 520, 0, 40)
 StartText.Position = UDim2.new(0.5, -260, 0.18, 0)
 StartText.BackgroundTransparency = 0.7
 StartText.Text = 'Push "T" to enable HACKS'
 StartText.TextColor3 = Color3.fromRGB(0,0,0)
 StartText.Font = Enum.Font.GothamBold
 StartText.TextSize = 20
-StartText.Visible = true
 StartText.Parent = ScreenGui
 
--- ===== FUNCIONES ESP (NO TOCADAS) =====
+-- ===== ESP =====
 local function addBox(part, color, transparency)
 	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
 
@@ -66,12 +62,18 @@ local function addBox(part, color, transparency)
 end
 
 local function createZombieESP(zombie)
+	if cachedZombies[zombie] then return end
+	cachedZombies[zombie] = true
+
 	for _, part in ipairs(zombie:GetChildren()) do
 		addBox(part, Color3.fromRGB(255, 0, 0), 0.6)
 	end
 end
 
-local function createMysteryESP(box)
+local function createBoxESP(box)
+	if cachedBoxes[box] then return end
+	cachedBoxes[box] = true
+
 	for _, part in ipairs(box:GetDescendants()) do
 		addBox(part, Color3.fromRGB(0, 200, 255), 0.45)
 	end
@@ -83,86 +85,11 @@ local function clearAll()
 		if obj then obj:Destroy() end
 	end
 	table.clear(espObjects)
-
-	for _, b in ipairs(beams) do b:Destroy() end
-	for _, a in ipairs(attachments) do a:Destroy() end
-	table.clear(beams)
-	table.clear(attachments)
+	table.clear(cachedZombies)
+	table.clear(cachedBoxes)
 end
 
--- ===== BEAM PATHFIND =====
-local function clearBeam()
-	for _, b in ipairs(beams) do b:Destroy() end
-	for _, a in ipairs(attachments) do a:Destroy() end
-	table.clear(beams)
-	table.clear(attachments)
-end
-
-local function drawBeamPath(targetPos)
-	clearBeam()
-
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local path = PathfindingService:CreatePath({
-		AgentRadius = 2,
-		AgentHeight = 5,
-		AgentCanJump = true
-	})
-
-	path:ComputeAsync(hrp.Position, targetPos)
-	if path.Status ~= Enum.PathStatus.Success then return end
-
-	local waypoints = path:GetWaypoints()
-	if #waypoints < 2 then return end
-
-	for _, wp in ipairs(waypoints) do
-		local att = Instance.new("Attachment")
-		att.WorldPosition = wp.Position + Vector3.new(0, 0.25, 0)
-		att.Parent = beamFolder
-		table.insert(attachments, att)
-	end
-
-	for i = 1, #attachments - 1 do
-		local beam = Instance.new("Beam")
-		beam.Attachment0 = attachments[i]
-		beam.Attachment1 = attachments[i + 1]
-		beam.FaceCamera = true
-		beam.Width0 = 0.22
-		beam.Width1 = 0.22
-		beam.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
-		beam.LightEmission = 1
-		beam.Transparency = NumberSequence.new(0)
-		beam.Parent = beamFolder
-		table.insert(beams, beam)
-	end
-end
-
--- ===== CAJA MÁS CERCANA =====
-local function getNearestMysteryBox()
-	local interact = workspace:FindFirstChild("Interact")
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not interact or not hrp then return end
-
-	local nearest, dist = nil, math.huge
-	for _, obj in ipairs(interact:GetChildren()) do
-		if obj.Name == "MysteryBox" then
-			local part = obj:FindFirstChildWhichIsA("BasePart")
-			if part then
-				local d = (hrp.Position - part.Position).Magnitude
-				if d < dist then
-					dist = d
-					nearest = part
-				end
-			end
-		end
-	end
-	return nearest
-end
-
--- ===== ACTIVAR ESP =====
+-- ===== INICIALIZAR ESP =====
 local function enableESP()
 	local baddies = workspace:FindFirstChild("Baddies")
 	if baddies then
@@ -175,13 +102,13 @@ local function enableESP()
 	if interact then
 		for _, obj in ipairs(interact:GetChildren()) do
 			if obj.Name == "MysteryBox" then
-				createMysteryESP(obj)
+				createBoxESP(obj)
 			end
 		end
 	end
 end
 
--- ===== LOOP =====
+-- ===== LOOP ALERTA (LIGERO) =====
 RunService.RenderStepped:Connect(function()
 	if not enabled then
 		AlertText.Visible = false
@@ -206,11 +133,6 @@ RunService.RenderStepped:Connect(function()
 		AlertText.Visible = true
 	else
 		AlertText.Visible = false
-	end
-
-	local box = getNearestMysteryBox()
-	if box then
-		drawBeamPath(box.Position)
 	end
 end)
 
