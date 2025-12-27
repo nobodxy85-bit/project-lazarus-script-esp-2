@@ -1,4 +1,4 @@
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PATHFIND CON BEAM (LIVIANO)
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PATHFIND AZUL CON BEAM
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -14,7 +14,7 @@ local enabled = false
 local espObjects = {}
 local firstTime = true
 
--- ===== FOLDER BEAM =====
+-- ===== BEAM PATH =====
 local beamFolder = Instance.new("Folder")
 beamFolder.Name = "PathBeam"
 beamFolder.Parent = workspace
@@ -41,22 +41,23 @@ local StartText = Instance.new("TextLabel")
 StartText.Size = UDim2.new(0, 520, 0, 50)
 StartText.Position = UDim2.new(0.5, -260, 0.18, 0)
 StartText.BackgroundTransparency = 0.7
-StartText.Text = 'Apreta "T" para activar tus poderes'
+StartText.Text = 'Push "T" to enable HACKS'
 StartText.TextColor3 = Color3.fromRGB(0,0,0)
 StartText.Font = Enum.Font.GothamBold
 StartText.TextSize = 20
 StartText.Visible = true
 StartText.Parent = ScreenGui
 
--- ===== ESP =====
+-- ===== FUNCIONES ESP (NO TOCADAS) =====
 local function addBox(part, color, transparency)
 	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
 
 	local box = Instance.new("BoxHandleAdornment")
 	box.Name = "ESP_Box"
 	box.Adornee = part
-	box.Size = part.Size + Vector3.new(0.15,0.15,0.15)
+	box.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
 	box.AlwaysOnTop = true
+	box.ZIndex = 10
 	box.Transparency = transparency
 	box.Color3 = color
 	box.Parent = part
@@ -66,20 +67,20 @@ end
 
 local function createZombieESP(zombie)
 	for _, part in ipairs(zombie:GetChildren()) do
-		addBox(part, Color3.fromRGB(255,0,0), 0.6)
+		addBox(part, Color3.fromRGB(255, 0, 0), 0.6)
 	end
 end
 
-local function createBoxESP(box)
+local function createMysteryESP(box)
 	for _, part in ipairs(box:GetDescendants()) do
-		addBox(part, Color3.fromRGB(0,200,255), 0.45)
+		addBox(part, Color3.fromRGB(0, 200, 255), 0.45)
 	end
 end
 
 -- ===== LIMPIAR =====
 local function clearAll()
-	for _, e in ipairs(espObjects) do
-		if e then e:Destroy() end
+	for _, obj in ipairs(espObjects) do
+		if obj then obj:Destroy() end
 	end
 	table.clear(espObjects)
 
@@ -89,7 +90,7 @@ local function clearAll()
 	table.clear(attachments)
 end
 
--- ===== PATHFIND BEAM =====
+-- ===== BEAM PATHFIND =====
 local function clearBeam()
 	for _, b in ipairs(beams) do b:Destroy() end
 	for _, a in ipairs(attachments) do a:Destroy() end
@@ -113,12 +114,12 @@ local function drawBeamPath(targetPos)
 	path:ComputeAsync(hrp.Position, targetPos)
 	if path.Status ~= Enum.PathStatus.Success then return end
 
-	local points = path:GetWaypoints()
-	if #points < 2 then return end
+	local waypoints = path:GetWaypoints()
+	if #waypoints < 2 then return end
 
-	for i, wp in ipairs(points) do
+	for _, wp in ipairs(waypoints) do
 		local att = Instance.new("Attachment")
-		att.WorldPosition = wp.Position + Vector3.new(0,0.25,0)
+		att.WorldPosition = wp.Position + Vector3.new(0, 0.25, 0)
 		att.Parent = beamFolder
 		table.insert(attachments, att)
 	end
@@ -130,17 +131,16 @@ local function drawBeamPath(targetPos)
 		beam.FaceCamera = true
 		beam.Width0 = 0.22
 		beam.Width1 = 0.22
-		beam.Color = ColorSequence.new(Color3.fromRGB(0,150,255))
+		beam.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
 		beam.LightEmission = 1
 		beam.Transparency = NumberSequence.new(0)
 		beam.Parent = beamFolder
-
 		table.insert(beams, beam)
 	end
 end
 
 -- ===== CAJA MÁS CERCANA =====
-local function getNearestBox()
+local function getNearestMysteryBox()
 	local interact = workspace:FindFirstChild("Interact")
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -175,7 +175,7 @@ local function enableESP()
 	if interact then
 		for _, obj in ipairs(interact:GetChildren()) do
 			if obj.Name == "MysteryBox" then
-				createBoxESP(obj)
+				createMysteryESP(obj)
 			end
 		end
 	end
@@ -202,13 +202,13 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	if count > 0 then
-		AlertText.Text = "⚠ ZOMBIE CERCA (x"..count..")"
+		AlertText.Text = "⚠ ZOMBIE CERCA (x" .. count .. ")"
 		AlertText.Visible = true
 	else
 		AlertText.Visible = false
 	end
 
-	local box = getNearestBox()
+	local box = getNearestMysteryBox()
 	if box then
 		drawBeamPath(box.Position)
 	end
