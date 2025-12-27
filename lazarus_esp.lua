@@ -1,4 +1,5 @@
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA (HUD LIMPIO / OPTIMIZADO)
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
+-- ESP SE APLICA A ZOMBIES NUEVOS AUTOMÁTICAMENTE
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -16,6 +17,9 @@ local firstTime = true
 local espObjects = {}
 local cachedZombies = {}
 local cachedBoxes = {}
+
+-- connections
+local zombieAddedConnection
 
 -- ===== GUI =====
 local ScreenGui = Instance.new("ScreenGui")
@@ -41,7 +45,7 @@ StartText.BackgroundTransparency = 0.7
 StartText.Text = 'Push "T" to enable HACKS'
 StartText.TextColor3 = Color3.fromRGB(0,0,0)
 StartText.Font = Enum.Font.GothamBold
-StartText.TextSize = 20
+	StartText.TextSize = 20
 StartText.Parent = ScreenGui
 
 -- ===== ESP =====
@@ -84,20 +88,36 @@ local function clearAll()
 	for _, obj in ipairs(espObjects) do
 		if obj then obj:Destroy() end
 	end
+
+	if zombieAddedConnection then
+		zombieAddedConnection:Disconnect()
+		zombieAddedConnection = nil
+	end
+
 	table.clear(espObjects)
 	table.clear(cachedZombies)
 	table.clear(cachedBoxes)
 end
 
--- ===== INICIALIZAR ESP =====
+-- ===== ACTIVAR ESP =====
 local function enableESP()
 	local baddies = workspace:FindFirstChild("Baddies")
-	if baddies then
-		for _, z in ipairs(baddies:GetChildren()) do
-			createZombieESP(z)
-		end
+	if not baddies then return end
+
+	-- zombies existentes
+	for _, z in ipairs(baddies:GetChildren()) do
+		createZombieESP(z)
 	end
 
+	-- zombies nuevos
+	zombieAddedConnection = baddies.ChildAdded:Connect(function(zombie)
+		task.wait(0.1)
+		if enabled then
+			createZombieESP(zombie)
+		end
+	end)
+
+	-- mystery box
 	local interact = workspace:FindFirstChild("Interact")
 	if interact then
 		for _, obj in ipairs(interact:GetChildren()) do
@@ -108,7 +128,7 @@ local function enableESP()
 	end
 end
 
--- ===== LOOP ALERTA (LIGERO) =====
+-- ===== LOOP ALERTA =====
 RunService.RenderStepped:Connect(function()
 	if not enabled then
 		AlertText.Visible = false
