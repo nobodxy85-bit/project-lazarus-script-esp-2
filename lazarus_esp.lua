@@ -13,7 +13,7 @@ local enabled = false
 local firstTime = true
 local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
-local AIM_FOV = 160 -- radio en pixeles (más bajo = más preciso)
+local AIM_FOV = 30 -- radio en pixeles (más bajo = más preciso)
 
 -- caches
 local espObjects = {}
@@ -286,6 +286,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		aimbotEnabled = not aimbotEnabled
 	end
 end)
+
 
 
 
