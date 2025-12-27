@@ -52,17 +52,17 @@ StartText.Parent = ScreenGui
 local EnabledText = Instance.new("TextLabel")
 EnabledText.Size = StartText.Size
 EnabledText.Position = StartText.Position
-EnabledText.BackgroundTransparency = 1
-EnabledText.Text = "Creator = Nobodxy85-bit"
+EnabledText.BackgroundTransparency = 0.7
+EnabledText.Text = "Creator = Nobodxy85-bit  :D"
 
 EnabledText.TextColor3 = Color3.new(0, 0, 0) -- NEGRO REAL
-EnabledText.TextTransparency = 1
+EnabledText.TextTransparency = 0.9
 
 EnabledText.TextStrokeTransparency = 0.7 
 EnabledText.RichText = false
 
 EnabledText.Font = Enum.Font.GothamBold
-EnabledText.TextSize = 22
+EnabledText.TextSize = 20
 EnabledText.Visible = false
 EnabledText.Parent = ScreenGui
 
@@ -212,5 +212,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
 
 
