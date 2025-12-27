@@ -102,6 +102,33 @@ local function getClosestZombieToCursor()
 	return closest
 end
 
+local function getClosestZombieToCursor()
+	local closest = nil
+	local shortest = math.huge
+	local mousePos = UserInputService:GetMouseLocation()
+
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+
+	for _, z in ipairs(baddies:GetChildren()) do
+		local head = z:FindFirstChild("Head")
+		local humanoid = z:FindFirstChildOfClass("Humanoid")
+
+		if head and humanoid and humanoid.Health > 0 then
+			local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+			if onScreen then
+				local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+				if dist < shortest then
+					shortest = dist
+					closest = head
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
 -- ===== ESP =====
 local function addBox(part, color, transparency)
 	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
@@ -183,7 +210,7 @@ local function enableESP()
 end
 
 RunService.RenderStepped:Connect(function()
-	-- ===== ESP / ALERTA =====
+	-- ===== ALERTA ZOMBIES =====
 	if not enabled then
 		AlertText.Visible = false
 	else
@@ -193,10 +220,15 @@ RunService.RenderStepped:Connect(function()
 
 		if hrp and baddies then
 			local count = 0
+
 			for _, z in ipairs(baddies:GetChildren()) do
 				local root = z:FindFirstChild("HumanoidRootPart")
-				if root and (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
-					count += 1
+				local humanoid = z:FindFirstChildOfClass("Humanoid")
+
+				if root and humanoid and humanoid.Health > 0 then
+					if (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
+						count += 1
+					end
 				end
 			end
 
@@ -209,13 +241,13 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- ===== AIMBOT =====
+	-- ===== AIMBOT (CABEZA) =====
 	if aimbotEnabled then
-		local target = getClosestZombieToCursor()
-		if target then
+		local head = getClosestZombieToCursor()
+		if head then
 			Camera.CFrame = CFrame.new(
 				Camera.CFrame.Position,
-				target.Position
+				head.Position
 			)
 		end
 	end
@@ -254,5 +286,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		aimbotEnabled = not aimbotEnabled
 	end
 end)
+
 
 
