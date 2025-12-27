@@ -52,9 +52,9 @@ StartText.Parent = ScreenGui
 local EnabledText = Instance.new("TextLabel")
 EnabledText.Size = StartText.Size
 EnabledText.Position = StartText.Position
-EnabledText.BackgroundTransparency = 1
+EnabledText.BackgroundTransparency = 0.7
 EnabledText.Text = "Creator = Nobodxy85-bit"
-EnabledText.TextColor3 = Color3.fromRGB(0, 200, 0)
+EnabledText.TextColor3 = Color3.fromRGB(0, 0, 0)
 EnabledText.Font = Enum.Font.GothamBold
 EnabledText.TextSize = 22
 EnabledText.TextTransparency = 1
@@ -207,3 +207,4 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
