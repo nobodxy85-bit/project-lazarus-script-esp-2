@@ -1,6 +1,5 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- UI: TEXTO ARRIBA + TEXTO FADE (ESP NO TOCADO)
-
+-- Creator = Nobodxy85-bit
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -212,6 +211,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		end
 	end
 end)
+
 
 
 
