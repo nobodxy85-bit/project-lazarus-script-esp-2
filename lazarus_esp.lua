@@ -1,5 +1,12 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- Creator = Nobodxy85-bit
+-- Creator = Nobodxy85-bit :D
+
+-- ===== VERIFICAR SI YA EXISTE =====
+if _G.ESP_ZOMBIES_LOADED then
+	warn("ESP Script ya está cargado. Usa el botón existente.")
+	return
+end
+_G.ESP_ZOMBIES_LOADED = true
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -11,7 +18,6 @@ local player = Players.LocalPlayer
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
 local enabled = false
-local firstTime = true
 local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
 local AIM_FOV = 30 -- radio en pixeles (más bajo = más preciso)
@@ -24,13 +30,6 @@ local cachedBoxes = {}
 
 -- connections
 local zombieAddedConnection
-
--- ===== VERIFICAR SI YA EXISTE =====
-if _G.ESP_ZOMBIES_LOADED then
-	warn("ESP Script ya está cargado. Usa el botón existente.")
-	return
-end
-_G.ESP_ZOMBIES_LOADED = true
 
 -- ===== GUI =====
 local ScreenGui = player:FindFirstChild("PlayerGui"):FindFirstChild("ESP_GUI")
@@ -175,20 +174,23 @@ local AimbotCorner = Instance.new("UICorner")
 AimbotCorner.CornerRadius = UDim.new(0, 10)
 AimbotCorner.Parent = AimbotButton
 
--- TEXTO ENABLED (FADE)
-local EnabledText = Instance.new("TextLabel")
-EnabledText.Size = UDim2.new(0, 520, 0, 40)
-EnabledText.Position = UDim2.new(0.5, -260, 0.10, 0)
-EnabledText.BackgroundTransparency = 0.7
-EnabledText.Text = "Creator = Nobodxy85-bit  :D"
-EnabledText.TextColor3 = Color3.new(255, 255, 255)
-EnabledText.TextTransparency = 0.9
-EnabledText.TextStrokeTransparency = 0.7 
-EnabledText.RichText = false
-EnabledText.Font = Enum.Font.GothamBold
-EnabledText.TextSize = 20
-EnabledText.Visible = false
-EnabledText.Parent = ScreenGui
+-- TEXTO DE BIENVENIDA (FADE)
+local WelcomeText = Instance.new("TextLabel")
+WelcomeText.Size = UDim2.new(0, 520, 0, 40)
+WelcomeText.Position = UDim2.new(0.5, -260, 0.20, 0)
+WelcomeText.BackgroundTransparency = 0.7
+WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+WelcomeText.Text = "Creator = Nobodxy85-bit  :D"
+WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+WelcomeText.TextTransparency = 0
+WelcomeText.Font = Enum.Font.GothamBold
+WelcomeText.TextSize = 20
+WelcomeText.Visible = true
+WelcomeText.Parent = ScreenGui
+
+local WelcomeCorner = Instance.new("UICorner")
+WelcomeCorner.CornerRadius = UDim.new(0, 10)
+WelcomeCorner.Parent = WelcomeText
 
 -- TEXTO DE ESTADO (ABAJO)
 local StatusText = Instance.new("TextLabel")
@@ -201,6 +203,18 @@ StatusText.Font = Enum.Font.GothamBold
 StatusText.TextSize = 18
 StatusText.Visible = false
 StatusText.Parent = ScreenGui
+
+-- Fade del texto de bienvenida al inicio
+task.spawn(function()
+	task.wait(3)
+	local steps = 30
+	for i = 0, steps do
+		WelcomeText.TextTransparency = i / steps
+		WelcomeText.BackgroundTransparency = 0.7 + (0.3 * (i / steps))
+		task.wait(2 / steps)
+	end
+	WelcomeText.Visible = false
+end)
 
 -- ===== FUNCION FADE =====
 local function fadeOut(label, duration)
@@ -341,19 +355,6 @@ end
 local function toggleESP()
 	enabled = not enabled
 
-	if firstTime then
-		CircleButton.Visible = false
-		EnabledText.Visible = true
-		EnabledText.TextTransparency = 0
-
-		task.spawn(function()
-			task.wait(3)
-			fadeOut(EnabledText, 2)
-		end)
-
-		firstTime = false
-	end
-
 	if enabled then
 		enableESP()
 		showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
@@ -467,14 +468,19 @@ local inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	end
 end)
 
--- ===== LIMPIEZA AL SALIR =====
+-- ===== LIMPIEZA AL SALIR DEL JUEGO =====
 local function cleanup()
 	if renderConnection then renderConnection:Disconnect() end
 	if inputConnection then inputConnection:Disconnect() end
 	clearAll()
+	_G.ESP_ZOMBIES_LOADED = nil
 end
 
--- Conectar limpieza cuando el jugador sale
-player.CharacterRemoving:Connect(cleanup)
+-- Conectar limpieza cuando el jugador sale completamente
+game:GetService("CoreGui").DescendantRemoving:Connect(function(obj)
+	if obj == ScreenGui then
+		cleanup()
+	end
+end)
 
-print("ESP Script cargado exitosamente! Usa el botón de engranaje o T/C para controlar.")
+print("✅ ESP Script cargado! Botón de engranaje disponible.")
