@@ -1,5 +1,5 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- Creator = Nobodxy85-bit :D
+-- Creator = Nobodxy85-bit
 
 -- ===== VERIFICAR SI YA EXISTE =====
 if _G.ESP_ZOMBIES_LOADED then
@@ -18,6 +18,7 @@ local player = Players.LocalPlayer
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
 local enabled = false
+local firstTimeKeyboard = true -- Solo para teclado
 local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
 local AIM_FOV = 30 -- radio en pixeles (más bajo = más preciso)
@@ -174,17 +175,17 @@ local AimbotCorner = Instance.new("UICorner")
 AimbotCorner.CornerRadius = UDim.new(0, 10)
 AimbotCorner.Parent = AimbotButton
 
--- TEXTO DE BIENVENIDA (FADE)
+-- TEXTO DE BIENVENIDA (ABAJO, NO TAPA EL ENGRANAJE)
 local WelcomeText = Instance.new("TextLabel")
-WelcomeText.Size = UDim2.new(0, 520, 0, 40)
-WelcomeText.Position = UDim2.new(0.5, -260, 0.20, 0)
-WelcomeText.BackgroundTransparency = 0.7
+WelcomeText.Size = UDim2.new(0, 400, 0, 35)
+WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0) -- ABAJO
+WelcomeText.BackgroundTransparency = 0.3
 WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 WelcomeText.Text = "Creator = Nobodxy85-bit  :D"
 WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 WelcomeText.TextTransparency = 0
 WelcomeText.Font = Enum.Font.GothamBold
-WelcomeText.TextSize = 20
+WelcomeText.TextSize = 18
 WelcomeText.Visible = true
 WelcomeText.Parent = ScreenGui
 
@@ -195,7 +196,7 @@ WelcomeCorner.Parent = WelcomeText
 -- TEXTO DE ESTADO (ABAJO)
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(0, 300, 0, 35)
-StatusText.Position = UDim2.new(0.5, -150, 0.9, 0)
+StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
 StatusText.BackgroundTransparency = 0.5
 StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -210,7 +211,7 @@ task.spawn(function()
 	local steps = 30
 	for i = 0, steps do
 		WelcomeText.TextTransparency = i / steps
-		WelcomeText.BackgroundTransparency = 0.7 + (0.3 * (i / steps))
+		WelcomeText.BackgroundTransparency = 0.3 + (0.7 * (i / steps))
 		task.wait(2 / steps)
 	end
 	WelcomeText.Visible = false
@@ -352,8 +353,14 @@ local function enableESP()
 end
 
 -- ===== TOGGLE ESP =====
-local function toggleESP()
+local function toggleESP(fromKeyboard)
 	enabled = not enabled
+
+	-- Solo ocultar el botón si es la primera vez Y desde teclado
+	if fromKeyboard and firstTimeKeyboard then
+		CircleButton.Visible = false
+		firstTimeKeyboard = false
+	end
 
 	if enabled then
 		enableESP()
@@ -400,7 +407,7 @@ CircleButton.MouseButton1Click:Connect(function()
 end)
 
 ESPButton.MouseButton1Click:Connect(function()
-	toggleESP()
+	toggleESP(false) -- NO es desde teclado, no ocultar botón
 end)
 
 AimbotButton.MouseButton1Click:Connect(function()
@@ -459,7 +466,7 @@ local inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 
 	-- ===== TECLA T (ESP) =====
 	if input.KeyCode == Enum.KeyCode.T then
-		toggleESP()
+		toggleESP(true) -- SÍ es desde teclado, ocultar botón en primera vez
 	end
 
 	-- ===== TECLA C (AIMBOT) =====
