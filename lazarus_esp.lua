@@ -1,5 +1,5 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- Creator = Nobodxy85-bit
+-- Creator = Nobodxy85-bit :D
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -332,8 +332,18 @@ local function toggleAimbot()
 end
 
 -- ===== EVENTOS BOTONES =====
+-- Toggle del menú con el botón circular
 CircleButton.MouseButton1Click:Connect(function()
 	MobileMenu.Visible = not MobileMenu.Visible
+	
+	-- Cambiar visual del botón según el estado del menú
+	if MobileMenu.Visible then
+		CircleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+		UIStroke.Color = Color3.fromRGB(0, 200, 255)
+	else
+		CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		UIStroke.Color = Color3.fromRGB(255, 255, 255)
+	end
 end)
 
 ESPButton.MouseButton1Click:Connect(function()
