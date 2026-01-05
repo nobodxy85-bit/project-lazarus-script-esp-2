@@ -1,10 +1,12 @@
+-- ===== GUARDAR CÓDIGO FUENTE PARA PERSISTENCIA =====
+getgenv().ESP_ZOMBIES_SOURCE = [[
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA
 -- Creator = Nobodxy85-bit
 -- Mejorado con persistencia entre servidores
 
--- ===== GUARDAR EN _G PARA PERSISTENCIA =====
-if not _G.ESP_ZOMBIES_CONFIG then
-	_G.ESP_ZOMBIES_CONFIG = {
+-- ===== PERSISTENCIA TIPO NAMELESS =====
+if not getgenv().ESP_ZOMBIES_CONFIG then
+	getgenv().ESP_ZOMBIES_CONFIG = {
 		espEnabled = false,
 		aimbotEnabled = false,
 		firstTimeKeyboard = true,
@@ -12,13 +14,13 @@ if not _G.ESP_ZOMBIES_CONFIG then
 	}
 end
 
--- ===== VERIFICAR SI YA EXISTE =====
+-- ===== VERIFICAR SI YA EXISTE EN ESTE SERVIDOR =====
 if _G.ESP_ZOMBIES_LOADED then
-	warn("ESP Script ya está cargado. Usa el botón existente.")
+	warn("⚠️ ESP Script ya está cargado en este servidor.")
+	warn("✅ Usa el botón de engranaje ⚙️ para controlar el ESP")
 	return
 end
 _G.ESP_ZOMBIES_LOADED = true
-_G.ESP_ZOMBIES_CONFIG.scriptLoaded = true
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -30,9 +32,9 @@ local player = Players.LocalPlayer
 
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
-local enabled = _G.ESP_ZOMBIES_CONFIG.espEnabled
-local aimbotEnabled = _G.ESP_ZOMBIES_CONFIG.aimbotEnabled
-local firstTimeKeyboard = _G.ESP_ZOMBIES_CONFIG.firstTimeKeyboard
+local enabled = getgenv().ESP_ZOMBIES_CONFIG.espEnabled
+local aimbotEnabled = getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled
+local firstTimeKeyboard = getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard
 local Camera = workspace.CurrentCamera
 local AIM_FOV = 30
 local SMOOTHNESS = 0.15
@@ -44,75 +46,104 @@ local cachedBoxes = {}
 
 -- connections
 local zombieAddedConnection
+local renderConnection
+local inputConnection
 
 -- ===== FUNCIÓN DE AUTO-RECARGA =====
 local function setupAutoReload()
-	-- Detectar cambio de servidor / teleport
-	player.OnTeleport:Connect(function(State)
-		if State == Enum.TeleportState.Started then
-			-- Guardar estado actual
-			_G.ESP_ZOMBIES_CONFIG.espEnabled = enabled
-			_G.ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
-			_G.ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+	if not queue_on_teleport then
+		warn("⚠️ queue_on_teleport no disponible - La persistencia no funcionará")
+		return
+	end
+
+	player.OnTeleport:Connect(function(state)
+		if state == Enum.TeleportState.Started then
+			print("🔄 Guardando configuración para el próximo servidor...")
 			
-			-- Preparar script para auto-ejecutarse
+			-- Guardar estados
+			getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
+			getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+			getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+
+			-- Preparar el script para el siguiente servidor
 			queue_on_teleport([[
 				repeat task.wait() until game:IsLoaded()
 				task.wait(2)
 				
-				-- Recargar el script
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/nobodxy85-bit/project-lazarus-script-esp-2/refs/heads/main/lazarus_esp.lua", true))()
+				print("🔄 Recargando ESP Script...")
+				
+				if getgenv().ESP_ZOMBIES_SOURCE then
+					local success, err = pcall(function()
+						loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
+					end)
+					
+					if success then
+						print("✅ ESP Script recargado exitosamente!")
+					else
+						warn("❌ Error recargando ESP:", err)
+					end
+				else
+					warn("❌ No se encontró el código fuente del ESP")
+				end
 			]])
 		end
 	end)
 end
 
 -- ===== GUI =====
-local ScreenGui = player:FindFirstChild("PlayerGui"):FindFirstChild("ESP_GUI")
+local PlayerGui = player:WaitForChild("PlayerGui")
+local ScreenGui = PlayerGui:FindFirstChild("ESP_GUI")
 
 -- Si ya existe la GUI, la reutilizamos
 if not ScreenGui then
 	ScreenGui = Instance.new("ScreenGui")
 	ScreenGui.Name = "ESP_GUI"
 	ScreenGui.ResetOnSpawn = false
-	ScreenGui.Parent = player:WaitForChild("PlayerGui")
+	ScreenGui.Parent = PlayerGui
+	print("🎨 GUI creada por primera vez")
 else
-	-- Limpiar elementos antiguos si existen
-	ScreenGui:ClearAllChildren()
+	print("🎨 GUI encontrada - reutilizando")
 end
 
 -- ALERTA
-local AlertText = Instance.new("TextLabel")
-AlertText.Size = UDim2.new(0, 360, 0, 50)
-AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
-AlertText.BackgroundTransparency = 1
-AlertText.TextColor3 = Color3.fromRGB(255, 0, 0)
-AlertText.Font = Enum.Font.GothamBold
-AlertText.TextSize = 30
-AlertText.Visible = false
-AlertText.Parent = ScreenGui
+local AlertText = ScreenGui:FindFirstChild("AlertText")
+if not AlertText then
+	AlertText = Instance.new("TextLabel")
+	AlertText.Name = "AlertText"
+	AlertText.Size = UDim2.new(0, 360, 0, 50)
+	AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
+	AlertText.BackgroundTransparency = 1
+	AlertText.TextColor3 = Color3.fromRGB(255, 0, 0)
+	AlertText.Font = Enum.Font.GothamBold
+	AlertText.TextSize = 30
+	AlertText.Visible = false
+	AlertText.Parent = ScreenGui
+end
 
 -- BOTÓN CIRCULAR
-local CircleButton = Instance.new("TextButton")
-CircleButton.Size = UDim2.new(0, 80, 0, 80)
-CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
-CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-CircleButton.BackgroundTransparency = 0.3
-CircleButton.Text = "⚙️"
-CircleButton.TextSize = 35
-CircleButton.Font = Enum.Font.GothamBold
-CircleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CircleButton.Parent = ScreenGui
+local CircleButton = ScreenGui:FindFirstChild("CircleButton")
+if not CircleButton then
+	CircleButton = Instance.new("TextButton")
+	CircleButton.Name = "CircleButton"
+	CircleButton.Size = UDim2.new(0, 80, 0, 80)
+	CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
+	CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	CircleButton.BackgroundTransparency = 0.3
+	CircleButton.Text = "⚙️"
+	CircleButton.TextSize = 35
+	CircleButton.Font = Enum.Font.GothamBold
+	CircleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	CircleButton.Parent = ScreenGui
 
--- Hacer el botón circular
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(1, 0)
-UICorner.Parent = CircleButton
+	local UICorner = Instance.new("UICorner")
+	UICorner.CornerRadius = UDim.new(1, 0)
+	UICorner.Parent = CircleButton
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(255, 255, 255)
-UIStroke.Thickness = 3
-UIStroke.Parent = CircleButton
+	local UIStroke = Instance.new("UIStroke")
+	UIStroke.Color = Color3.fromRGB(255, 255, 255)
+	UIStroke.Thickness = 3
+	UIStroke.Parent = CircleButton
+end
 
 -- Hacer el botón arrastrable
 local dragging = false
@@ -151,134 +182,176 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- MENU MÓVIL
-local MobileMenu = Instance.new("Frame")
-MobileMenu.Size = UDim2.new(0, 280, 0, 260)
-MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -130)
-MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MobileMenu.BackgroundTransparency = 0.1
-MobileMenu.BorderSizePixel = 0
-MobileMenu.Visible = false
-MobileMenu.Parent = ScreenGui
+local MobileMenu = ScreenGui:FindFirstChild("MobileMenu")
+if not MobileMenu then
+	MobileMenu = Instance.new("Frame")
+	MobileMenu.Name = "MobileMenu"
+	MobileMenu.Size = UDim2.new(0, 280, 0, 260)
+	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -130)
+	MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	MobileMenu.BackgroundTransparency = 0.1
+	MobileMenu.BorderSizePixel = 0
+	MobileMenu.Visible = false
+	MobileMenu.Parent = ScreenGui
 
-local MenuCorner = Instance.new("UICorner")
-MenuCorner.CornerRadius = UDim.new(0, 15)
-MenuCorner.Parent = MobileMenu
+	local MenuCorner = Instance.new("UICorner")
+	MenuCorner.CornerRadius = UDim.new(0, 15)
+	MenuCorner.Parent = MobileMenu
 
-local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(255, 255, 255)
-MenuStroke.Thickness = 2
-MenuStroke.Parent = MobileMenu
+	local MenuStroke = Instance.new("UIStroke")
+	MenuStroke.Color = Color3.fromRGB(255, 255, 255)
+	MenuStroke.Thickness = 2
+	MenuStroke.Parent = MobileMenu
+end
 
 -- TÍTULO DEL MENÚ
-local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 40)
-MenuTitle.Position = UDim2.new(0, 0, 0, 0)
-MenuTitle.BackgroundTransparency = 1
-MenuTitle.Text = "MENU DE CONTROL"
-MenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-MenuTitle.Font = Enum.Font.GothamBold
-MenuTitle.TextSize = 18
-MenuTitle.Parent = MobileMenu
+local MenuTitle = MobileMenu:FindFirstChild("MenuTitle")
+if not MenuTitle then
+	MenuTitle = Instance.new("TextLabel")
+	MenuTitle.Name = "MenuTitle"
+	MenuTitle.Size = UDim2.new(1, 0, 0, 40)
+	MenuTitle.Position = UDim2.new(0, 0, 0, 0)
+	MenuTitle.BackgroundTransparency = 1
+	MenuTitle.Text = "MENU DE CONTROL"
+	MenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	MenuTitle.Font = Enum.Font.GothamBold
+	MenuTitle.TextSize = 18
+	MenuTitle.Parent = MobileMenu
+end
 
 -- BOTÓN ESP
-local ESPButton = Instance.new("TextButton")
-ESPButton.Size = UDim2.new(0, 240, 0, 50)
-ESPButton.Position = UDim2.new(0.5, -120, 0, 55)
+local ESPButton = MobileMenu:FindFirstChild("ESPButton")
+if not ESPButton then
+	ESPButton = Instance.new("TextButton")
+	ESPButton.Name = "ESPButton"
+	ESPButton.Size = UDim2.new(0, 240, 0, 50)
+	ESPButton.Position = UDim2.new(0.5, -120, 0, 55)
+	ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	ESPButton.Font = Enum.Font.GothamBold
+	ESPButton.TextSize = 20
+	ESPButton.Parent = MobileMenu
+
+	local ESPCorner = Instance.new("UICorner")
+	ESPCorner.CornerRadius = UDim.new(0, 10)
+	ESPCorner.Parent = ESPButton
+end
+
+-- Actualizar estado visual del botón ESP
 ESPButton.BackgroundColor3 = enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 ESPButton.Text = enabled and "ESP: ON" or "ESP: OFF"
-ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPButton.Font = Enum.Font.GothamBold
-ESPButton.TextSize = 20
-ESPButton.Parent = MobileMenu
-
-local ESPCorner = Instance.new("UICorner")
-ESPCorner.CornerRadius = UDim.new(0, 10)
-ESPCorner.Parent = ESPButton
 
 -- BOTÓN AIMBOT
-local AimbotButton = Instance.new("TextButton")
-AimbotButton.Size = UDim2.new(0, 240, 0, 50)
-AimbotButton.Position = UDim2.new(0.5, -120, 0, 115)
+local AimbotButton = MobileMenu:FindFirstChild("AimbotButton")
+if not AimbotButton then
+	AimbotButton = Instance.new("TextButton")
+	AimbotButton.Name = "AimbotButton"
+	AimbotButton.Size = UDim2.new(0, 240, 0, 50)
+	AimbotButton.Position = UDim2.new(0.5, -120, 0, 115)
+	AimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	AimbotButton.Font = Enum.Font.GothamBold
+	AimbotButton.TextSize = 20
+	AimbotButton.Parent = MobileMenu
+
+	local AimbotCorner = Instance.new("UICorner")
+	AimbotCorner.CornerRadius = UDim.new(0, 10)
+	AimbotCorner.Parent = AimbotButton
+end
+
+-- Actualizar estado visual del botón Aimbot
 AimbotButton.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 AimbotButton.Text = aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF"
-AimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-AimbotButton.Font = Enum.Font.GothamBold
-AimbotButton.TextSize = 20
-AimbotButton.Parent = MobileMenu
 
-local AimbotCorner = Instance.new("UICorner")
-AimbotCorner.CornerRadius = UDim.new(0, 10)
-AimbotCorner.Parent = AimbotButton
+-- BOTÓN SERVER HOP
+local ServerHopButton = MobileMenu:FindFirstChild("ServerHopButton")
+if not ServerHopButton then
+	ServerHopButton = Instance.new("TextButton")
+	ServerHopButton.Name = "ServerHopButton"
+	ServerHopButton.Size = UDim2.new(0, 240, 0, 50)
+	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 175)
+	ServerHopButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+	ServerHopButton.Text = "🔄 CAMBIAR SERVER"
+	ServerHopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	ServerHopButton.Font = Enum.Font.GothamBold
+	ServerHopButton.TextSize = 18
+	ServerHopButton.Parent = MobileMenu
 
--- BOTÓN SERVER HOP (NUEVO)
-local ServerHopButton = Instance.new("TextButton")
-ServerHopButton.Size = UDim2.new(0, 240, 0, 50)
-ServerHopButton.Position = UDim2.new(0.5, -120, 0, 175)
-ServerHopButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-ServerHopButton.Text = "🔄 CAMBIAR SERVER"
-ServerHopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ServerHopButton.Font = Enum.Font.GothamBold
-ServerHopButton.TextSize = 18
-ServerHopButton.Parent = MobileMenu
+	local ServerHopCorner = Instance.new("UICorner")
+	ServerHopCorner.CornerRadius = UDim.new(0, 10)
+	ServerHopCorner.Parent = ServerHopButton
+end
 
-local ServerHopCorner = Instance.new("UICorner")
-ServerHopCorner.CornerRadius = UDim.new(0, 10)
-ServerHopCorner.Parent = ServerHopButton
+-- TEXTO DE BIENVENIDA
+local WelcomeText = ScreenGui:FindFirstChild("WelcomeText")
+if not WelcomeText then
+	WelcomeText = Instance.new("TextLabel")
+	WelcomeText.Name = "WelcomeText"
+	WelcomeText.Size = UDim2.new(0, 400, 0, 35)
+	WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
+	WelcomeText.BackgroundTransparency = 0.3
+	WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	WelcomeText.Text = "Creator = Nobodxy85-bit  :D"
+	WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	WelcomeText.TextTransparency = 0
+	WelcomeText.Font = Enum.Font.GothamBold
+	WelcomeText.TextSize = 18
+	WelcomeText.Visible = true
+	WelcomeText.Parent = ScreenGui
 
--- TEXTO DE BIENVENIDA (ABAJO, NO TAPA EL ENGRANAJE)
-local WelcomeText = Instance.new("TextLabel")
-WelcomeText.Size = UDim2.new(0, 400, 0, 35)
-WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
-WelcomeText.BackgroundTransparency = 0.3
-WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-WelcomeText.Text = "Creator = Nobodxy85-bit  :D"
-WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-WelcomeText.TextTransparency = 0
-WelcomeText.Font = Enum.Font.GothamBold
-WelcomeText.TextSize = 18
-WelcomeText.Visible = true
-WelcomeText.Parent = ScreenGui
+	local WelcomeCorner = Instance.new("UICorner")
+	WelcomeCorner.CornerRadius = UDim.new(0, 10)
+	WelcomeCorner.Parent = WelcomeText
 
-local WelcomeCorner = Instance.new("UICorner")
-WelcomeCorner.CornerRadius = UDim.new(0, 10)
-WelcomeCorner.Parent = WelcomeText
+	-- Fade del texto de bienvenida
+	task.spawn(function()
+		task.wait(3)
+		local steps = 30
+		for i = 0, steps do
+			if WelcomeText then
+				WelcomeText.TextTransparency = i / steps
+				WelcomeText.BackgroundTransparency = 0.3 + (0.7 * (i / steps))
+				task.wait(2 / steps)
+			end
+		end
+		if WelcomeText then
+			WelcomeText.Visible = false
+		end
+	end)
+end
 
--- TEXTO DE ESTADO (ABAJO)
-local StatusText = Instance.new("TextLabel")
-StatusText.Size = UDim2.new(0, 300, 0, 35)
-StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
-StatusText.BackgroundTransparency = 0.5
-StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
-StatusText.Font = Enum.Font.GothamBold
-StatusText.TextSize = 18
-StatusText.Visible = false
-StatusText.Parent = ScreenGui
-
--- Fade del texto de bienvenida al inicio
-task.spawn(function()
-	task.wait(3)
-	local steps = 30
-	for i = 0, steps do
-		WelcomeText.TextTransparency = i / steps
-		WelcomeText.BackgroundTransparency = 0.3 + (0.7 * (i / steps))
-		task.wait(2 / steps)
-	end
-	WelcomeText.Visible = false
-end)
+-- TEXTO DE ESTADO
+local StatusText = ScreenGui:FindFirstChild("StatusText")
+if not StatusText then
+	StatusText = Instance.new("TextLabel")
+	StatusText.Name = "StatusText"
+	StatusText.Size = UDim2.new(0, 300, 0, 35)
+	StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
+	StatusText.BackgroundTransparency = 0.5
+	StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	StatusText.Font = Enum.Font.GothamBold
+	StatusText.TextSize = 18
+	StatusText.Visible = false
+	StatusText.Parent = ScreenGui
+end
 
 -- ===== FUNCION FADE =====
 local function fadeOut(label, duration)
 	local steps = 30
 	for i = 0, steps do
-		label.TextTransparency = i / steps
-		task.wait(duration / steps)
+		if label then
+			label.TextTransparency = i / steps
+			task.wait(duration / steps)
+		end
 	end
-	label.Visible = false
+	if label then
+		label.Visible = false
+	end
 end
 
 -- ===== FUNCION MOSTRAR ESTADO =====
 local function showStatus(text, color)
+	if not StatusText then return end
+	
 	StatusText.Text = text
 	StatusText.TextColor3 = color
 	StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -297,9 +370,9 @@ local function serverHop()
 	showStatus("🔄 Buscando servidor...", Color3.fromRGB(100, 150, 255))
 	
 	-- Guardar estado antes de cambiar
-	_G.ESP_ZOMBIES_CONFIG.espEnabled = enabled
-	_G.ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
-	_G.ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
+	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
 	
 	local success, errorMsg = pcall(function()
 		local servers = {}
@@ -436,12 +509,12 @@ end
 -- ===== TOGGLE ESP =====
 local function toggleESP(fromKeyboard)
 	enabled = not enabled
-	_G.ESP_ZOMBIES_CONFIG.espEnabled = enabled
+	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
 
 	if fromKeyboard and firstTimeKeyboard then
 		CircleButton.Visible = false
 		firstTimeKeyboard = false
-		_G.ESP_ZOMBIES_CONFIG.firstTimeKeyboard = false
+		getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = false
 	end
 
 	if enabled then
@@ -461,7 +534,7 @@ end
 -- ===== TOGGLE AIMBOT =====
 local function toggleAimbot()
 	aimbotEnabled = not aimbotEnabled
-	_G.ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
 	
 	if aimbotEnabled then
 		showStatus("AIMBOT | ENABLE", Color3.fromRGB(0, 255, 0))
@@ -480,10 +553,10 @@ CircleButton.MouseButton1Click:Connect(function()
 	
 	if MobileMenu.Visible then
 		CircleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-		UIStroke.Color = Color3.fromRGB(0, 200, 255)
+		CircleButton:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(0, 200, 255)
 	else
 		CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		UIStroke.Color = Color3.fromRGB(255, 255, 255)
+		CircleButton:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(255, 255, 255)
 	end
 end)
 
@@ -500,16 +573,16 @@ ServerHopButton.MouseButton1Click:Connect(function()
 end)
 
 -- ===== BUCLE PRINCIPAL =====
-local renderConnection = RunService.RenderStepped:Connect(function()
+renderConnection = RunService.RenderStepped:Connect(function()
 	-- ===== ALERTA ZOMBIES =====
 	if not enabled then
-		AlertText.Visible = false
+		if AlertText then AlertText.Visible = false end
 	else
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		local baddies = workspace:FindFirstChild("Baddies")
 
-		if hrp and baddies then
+		if hrp and baddies and AlertText then
 			local count = 0
 
 			for _, z in ipairs(baddies:GetChildren()) do
@@ -543,7 +616,7 @@ local renderConnection = RunService.RenderStepped:Connect(function()
 end)
 
 -- ===== CONTROLES DE TECLADO (PC) =====
-local inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
+inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
 	if input.KeyCode == Enum.KeyCode.T then
@@ -559,16 +632,18 @@ local inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	end
 end)
 
--- ===== LIMPIEZA AL SALIR DEL JUEGO =====
+-- ===== LIMPIEZA SOLO CUANDO SE CIERRE ROBLOX =====
 local function cleanup()
+	print("🧹 Limpiando conexiones del ESP...")
 	if renderConnection then renderConnection:Disconnect() end
 	if inputConnection then inputConnection:Disconnect() end
+	if zombieAddedConnection then zombieAddedConnection:Disconnect() end
 	clearAll()
-	_G.ESP_ZOMBIES_LOADED = nil
 end
 
-game:GetService("CoreGui").DescendantRemoving:Connect(function(obj)
-	if obj == ScreenGui then
+-- Solo limpiar cuando el jugador se va del juego completamente
+Players.PlayerRemoving:Connect(function(plr)
+	if plr == player then
 		cleanup()
 	end
 end)
@@ -576,14 +651,25 @@ end)
 -- ===== ACTIVAR PERSISTENCIA =====
 setupAutoReload()
 
--- ===== AUTO-ACTIVAR SI ESTABA ACTIVO =====
-if enabled then
-	enableESP()
-end
+-- ===== AUTO REACTIVAR SI ESTABA ENCENDIDO =====
+task.spawn(function()
+	task.wait(1)
+	if getgenv().ESP_ZOMBIES_CONFIG.espEnabled then
+		print("🔄 Reactivando ESP automáticamente...")
+		enableESP()
+		showStatus("ESP | AUTO-ACTIVADO", Color3.fromRGB(0, 255, 0))
+	end
+end)
 
 print("✅ ESP Script con persistencia cargado!")
 print("📌 Controles:")
 print("   T = Toggle ESP")
 print("   C = Toggle Aimbot")
 print("   H = Server Hop")
+print("   Botón ⚙️ = Abrir menú")
 print("   Botón 🔄 = Cambiar servidor")
+print("🔒 La GUI permanecerá visible incluso al morir")
+]]
+
+-- ===== EJECUTAR EL SCRIPT =====
+loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
