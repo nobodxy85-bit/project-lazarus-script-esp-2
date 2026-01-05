@@ -49,41 +49,48 @@ local zombieAddedConnection
 local renderConnection
 local inputConnection
 
--- ===== FUNCIÓN DE AUTO-RECARGA =====
+-- ===== FUNCIÓN DE AUTO-RECARGA (ESTILO INFINITE YIELD REAL) =====
 local function setupAutoReload()
-	if not queue_on_teleport then
-		warn("⚠️ queue_on_teleport no disponible - La persistencia no funcionará")
+	local queue =
+		queue_on_teleport
+		or (syn and syn.queue_on_teleport)
+		or (fluxus and fluxus.queue_on_teleport)
+
+	if not queue then
+		warn("⚠️ queue_on_teleport no disponible - persistencia desactivada")
 		return
 	end
 
 	player.OnTeleport:Connect(function(state)
-		if state == Enum.TeleportState.Started then
-			print("🔄 Guardando configuración para el próximo servidor...")
-			
-			-- Guardar estados
-			getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
-			getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
-			getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
-
-			-- Preparar el script para el siguiente servidor (usando string concatenation en vez de [[]])
-			local code = "repeat task.wait() until game:IsLoaded()\n" ..
-				"task.wait(2)\n" ..
-				"print('🔄 Recargando ESP Script...')\n" ..
-				"if getgenv().ESP_ZOMBIES_SOURCE then\n" ..
-				"	local success, err = pcall(function()\n" ..
-				"		loadstring(getgenv().ESP_ZOMBIES_SOURCE)()\n" ..
-				"	end)\n" ..
-				"	if success then\n" ..
-				"		print('✅ ESP Script recargado exitosamente!')\n" ..
-				"	else\n" ..
-				"		warn('❌ Error recargando ESP:', err)\n" ..
-				"	end\n" ..
-				"else\n" ..
-				"	warn('❌ No se encontró el código fuente del ESP')\n" ..
-				"end"
-			
-			queue_on_teleport(code)
+		if state ~= Enum.TeleportState.Started then
+			return
 		end
+
+		print("🔄 Guardando estado para el próximo servidor...")
+
+		-- Guardar configuración
+		getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
+		getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+		getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+
+		-- Código que se ejecutará EN EL NUEVO SERVER
+		local code = [[
+			repeat task.wait() until game:IsLoaded()
+			task.wait(1)
+
+			-- limpiar flags viejas del server anterior
+			_G.ESP_ZOMBIES_LOADED = nil
+
+			if getgenv().ESP_ZOMBIES_SOURCE then
+				print("🔄 Recargando ESP persistente...")
+				loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
+				print("✅ ESP recargado correctamente")
+			else
+				warn("❌ ESP_ZOMBIES_SOURCE no encontrado")
+			end
+		]]
+
+		queue(code)
 	end)
 end
 
@@ -668,5 +675,5 @@ print("   Botón 🔄 = Cambiar servidor")
 print("🔒 La GUI permanecerá visible incluso al morir")
 ]==]
 
--- ===== EJECUTAR EL SCRIPT =====
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
+
