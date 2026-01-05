@@ -15,6 +15,7 @@ local firstTime = true
 local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
 local AIM_FOV = 30 -- radio en pixeles (más bajo = más preciso)
+local SMOOTHNESS = 0.15 -- suavizado (0.1-0.3 recomendado, más bajo = más suave)
 
 -- caches
 local espObjects = {}
@@ -245,14 +246,15 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- ===== AIMBOT (CABEZA) =====
+	-- ===== AIMBOT CON SUAVIZADO =====
 	if aimbotEnabled then
 		local head = getClosestZombieToCursor()
 		if head then
-			Camera.CFrame = CFrame.new(
-				Camera.CFrame.Position,
-				head.Position
-			)
+			-- Calcular la dirección objetivo
+			local targetCFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+			
+			-- Interpolar suavemente entre la cámara actual y el objetivo
+			Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
 		end
 	end
 end)
