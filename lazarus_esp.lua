@@ -57,17 +57,26 @@ EnabledText.Size = StartText.Size
 EnabledText.Position = StartText.Position
 EnabledText.BackgroundTransparency = 0.7
 EnabledText.Text = "Creator = Nobodxy85-bit  :D"
-
 EnabledText.TextColor3 = Color3.new(255, 255, 255) -- NEGRO REAL
 EnabledText.TextTransparency = 0.9
-
 EnabledText.TextStrokeTransparency = 0.7 
 EnabledText.RichText = false
-
 EnabledText.Font = Enum.Font.GothamBold
 EnabledText.TextSize = 20
 EnabledText.Visible = false
 EnabledText.Parent = ScreenGui
+
+-- TEXTO DE ESTADO (ABAJO)
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 300, 0, 35)
+StatusText.Position = UDim2.new(0.5, -150, 0.9, 0)
+StatusText.BackgroundTransparency = 0.5
+StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusText.Font = Enum.Font.GothamBold
+StatusText.TextSize = 18
+StatusText.Visible = false
+StatusText.Parent = ScreenGui
 
 -- ===== FUNCION FADE =====
 local function fadeOut(label, duration)
@@ -79,28 +88,19 @@ local function fadeOut(label, duration)
 	label.Visible = false
 end
 
-local function getClosestZombieToCursor()
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not baddies then return end
-
-	local closest, shortest = nil, AIM_FOV
-	local mousePos = UserInputService:GetMouseLocation()
-
-	for _, z in ipairs(baddies:GetChildren()) do
-		local hrp = z:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-			if onScreen then
-				local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-				if dist < shortest then
-					shortest = dist
-					closest = hrp
-				end
-			end
-		end
-	end
-
-	return closest
+-- ===== FUNCION MOSTRAR ESTADO =====
+local function showStatus(text, color)
+	StatusText.Text = text
+	StatusText.TextColor3 = color
+	StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	StatusText.Visible = true
+	StatusText.TextTransparency = 0
+	StatusText.BackgroundTransparency = 0.5
+	
+	task.spawn(function()
+		task.wait(2)
+		fadeOut(StatusText, 1)
+	end)
 end
 
 local function getClosestZombieToCursor()
@@ -130,21 +130,19 @@ local function getClosestZombieToCursor()
 	return closest
 end
 
--- ===== ESP =====
-local function addBox(part, color, transparency)
-	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Box") then return end
+-- ===== ESP (SOLO BORDES) =====
+local function addOutline(part, color)
+	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Highlight") then return end
 
-	local box = Instance.new("BoxHandleAdornment")
-	box.Name = "ESP_Box"
-	box.Adornee = part
-	box.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
-	box.AlwaysOnTop = true
-	box.ZIndex = 10
-	box.Transparency = transparency
-	box.Color3 = color
-	box.Parent = part
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.Adornee = part
+	highlight.FillTransparency = 1 -- Sin relleno, solo bordes
+	highlight.OutlineTransparency = 0
+	highlight.OutlineColor = color
+	highlight.Parent = part
 
-	table.insert(espObjects, box)
+	table.insert(espObjects, highlight)
 end
 
 local function createZombieESP(zombie)
@@ -152,7 +150,9 @@ local function createZombieESP(zombie)
 	cachedZombies[zombie] = true
 
 	for _, part in ipairs(zombie:GetChildren()) do
-		addBox(part, Color3.fromRGB(255, 0, 0), 0.6)
+		if part:IsA("BasePart") then
+			addOutline(part, Color3.fromRGB(255, 0, 0))
+		end
 	end
 end
 
@@ -161,7 +161,10 @@ local function createBoxESP(box)
 	cachedBoxes[box] = true
 
 	for _, part in ipairs(box:GetDescendants()) do
-		addBox(part, Color3.fromRGB(0, 200, 255), 0.45)
+		-- Ignorar partes llamadas "Part"
+		if part:IsA("BasePart") and part.Name ~= "Part" then
+			addOutline(part, Color3.fromRGB(0, 200, 255))
+		end
 	end
 end
 
@@ -276,19 +279,22 @@ UserInputService.InputBegan:Connect(function(input, gp)
 
 		if enabled then
 			enableESP()
+			showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
 		else
 			clearAll()
 			AlertText.Visible = false
+			showStatus("ESP | DISABLE", Color3.fromRGB(255, 0, 0))
 		end
 	end
 
 	-- ===== TECLA C (AIMBOT) =====
 	if input.KeyCode == Enum.KeyCode.C then
 		aimbotEnabled = not aimbotEnabled
+		
+		if aimbotEnabled then
+			showStatus("AIMBOT | ENABLE", Color3.fromRGB(0, 255, 0))
+		else
+			showStatus("AIMBOT | DISABLE", Color3.fromRGB(255, 0, 0))
+		end
 	end
 end)
-
-
-
-
-
