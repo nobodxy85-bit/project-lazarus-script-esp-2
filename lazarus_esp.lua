@@ -41,24 +41,95 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- TEXTO INICIAL (MAS ARRIBA)
-local StartText = Instance.new("TextLabel")
-StartText.Size = UDim2.new(0, 520, 0, 40)
-StartText.Position = UDim2.new(0.5, -260, 0.10, 0)
-StartText.BackgroundTransparency = 0.7
-StartText.Text = 'Push "T" to enable ESP and "c" aimbot'
-StartText.TextColor3 = Color3.fromRGB(0, 0, 0)
-StartText.Font = Enum.Font.GothamBold
-StartText.TextSize = 20
-StartText.Parent = ScreenGui
+-- BOTÓN CIRCULAR (REEMPLAZA StartText)
+local CircleButton = Instance.new("TextButton")
+CircleButton.Size = UDim2.new(0, 80, 0, 80)
+CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
+CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CircleButton.BackgroundTransparency = 0.3
+CircleButton.Text = "⚙️"
+CircleButton.TextSize = 35
+CircleButton.Font = Enum.Font.GothamBold
+CircleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CircleButton.Parent = ScreenGui
 
--- TEXTO ENABLED (FADE) - NEGRO FORZADO
+-- Hacer el botón circular
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = CircleButton
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(255, 255, 255)
+UIStroke.Thickness = 3
+UIStroke.Parent = CircleButton
+
+-- MENU MÓVIL
+local MobileMenu = Instance.new("Frame")
+MobileMenu.Size = UDim2.new(0, 280, 0, 200)
+MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -100)
+MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MobileMenu.BackgroundTransparency = 0.1
+MobileMenu.BorderSizePixel = 0
+MobileMenu.Visible = false
+MobileMenu.Parent = ScreenGui
+
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 15)
+MenuCorner.Parent = MobileMenu
+
+local MenuStroke = Instance.new("UIStroke")
+MenuStroke.Color = Color3.fromRGB(255, 255, 255)
+MenuStroke.Thickness = 2
+MenuStroke.Parent = MobileMenu
+
+-- TÍTULO DEL MENÚ
+local MenuTitle = Instance.new("TextLabel")
+MenuTitle.Size = UDim2.new(1, 0, 0, 40)
+MenuTitle.Position = UDim2.new(0, 0, 0, 0)
+MenuTitle.BackgroundTransparency = 1
+MenuTitle.Text = "MENU DE CONTROL"
+MenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MenuTitle.Font = Enum.Font.GothamBold
+MenuTitle.TextSize = 18
+MenuTitle.Parent = MobileMenu
+
+-- BOTÓN ESP
+local ESPButton = Instance.new("TextButton")
+ESPButton.Size = UDim2.new(0, 240, 0, 50)
+ESPButton.Position = UDim2.new(0.5, -120, 0, 55)
+ESPButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+ESPButton.Text = "ESP: OFF"
+ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPButton.Font = Enum.Font.GothamBold
+ESPButton.TextSize = 20
+ESPButton.Parent = MobileMenu
+
+local ESPCorner = Instance.new("UICorner")
+ESPCorner.CornerRadius = UDim.new(0, 10)
+ESPCorner.Parent = ESPButton
+
+-- BOTÓN AIMBOT
+local AimbotButton = Instance.new("TextButton")
+AimbotButton.Size = UDim2.new(0, 240, 0, 50)
+AimbotButton.Position = UDim2.new(0.5, -120, 0, 115)
+AimbotButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+AimbotButton.Text = "AIMBOT: OFF"
+AimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimbotButton.Font = Enum.Font.GothamBold
+AimbotButton.TextSize = 20
+AimbotButton.Parent = MobileMenu
+
+local AimbotCorner = Instance.new("UICorner")
+AimbotCorner.CornerRadius = UDim.new(0, 10)
+AimbotCorner.Parent = AimbotButton
+
+-- TEXTO ENABLED (FADE)
 local EnabledText = Instance.new("TextLabel")
-EnabledText.Size = StartText.Size
-EnabledText.Position = StartText.Position
+EnabledText.Size = UDim2.new(0, 520, 0, 40)
+EnabledText.Position = UDim2.new(0.5, -260, 0.10, 0)
 EnabledText.BackgroundTransparency = 0.7
 EnabledText.Text = "Creator = Nobodxy85-bit  :D"
-EnabledText.TextColor3 = Color3.new(255, 255, 255) -- NEGRO REAL
+EnabledText.TextColor3 = Color3.new(255, 255, 255)
 EnabledText.TextTransparency = 0.9
 EnabledText.TextStrokeTransparency = 0.7 
 EnabledText.RichText = false
@@ -214,6 +285,66 @@ local function enableESP()
 	end
 end
 
+-- ===== TOGGLE ESP =====
+local function toggleESP()
+	enabled = not enabled
+
+	if firstTime then
+		CircleButton.Visible = false
+		EnabledText.Visible = true
+		EnabledText.TextTransparency = 0
+
+		task.spawn(function()
+			task.wait(3)
+			fadeOut(EnabledText, 2)
+		end)
+
+		firstTime = false
+	end
+
+	if enabled then
+		enableESP()
+		showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
+		ESPButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+		ESPButton.Text = "ESP: ON"
+	else
+		clearAll()
+		AlertText.Visible = false
+		showStatus("ESP | DISABLE", Color3.fromRGB(255, 0, 0))
+		ESPButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		ESPButton.Text = "ESP: OFF"
+	end
+end
+
+-- ===== TOGGLE AIMBOT =====
+local function toggleAimbot()
+	aimbotEnabled = not aimbotEnabled
+	
+	if aimbotEnabled then
+		showStatus("AIMBOT | ENABLE", Color3.fromRGB(0, 255, 0))
+		AimbotButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+		AimbotButton.Text = "AIMBOT: ON"
+	else
+		showStatus("AIMBOT | DISABLE", Color3.fromRGB(255, 0, 0))
+		AimbotButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		AimbotButton.Text = "AIMBOT: OFF"
+	end
+end
+
+-- ===== EVENTOS BOTONES =====
+CircleButton.MouseButton1Click:Connect(function()
+	MobileMenu.Visible = not MobileMenu.Visible
+end)
+
+ESPButton.MouseButton1Click:Connect(function()
+	toggleESP()
+end)
+
+AimbotButton.MouseButton1Click:Connect(function()
+	toggleAimbot()
+end)
+
+-- ===== BUCLE PRINCIPAL =====
 RunService.RenderStepped:Connect(function()
 	-- ===== ALERTA ZOMBIES =====
 	if not enabled then
@@ -259,44 +390,17 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- ===== CONTROLES DE TECLADO (PC) =====
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
 	-- ===== TECLA T (ESP) =====
 	if input.KeyCode == Enum.KeyCode.T then
-		enabled = not enabled
-
-		if firstTime then
-			StartText.Visible = false
-			EnabledText.Visible = true
-			EnabledText.TextTransparency = 0
-
-			task.spawn(function()
-				task.wait(3)
-				fadeOut(EnabledText, 2)
-			end)
-
-			firstTime = false
-		end
-
-		if enabled then
-			enableESP()
-			showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
-		else
-			clearAll()
-			AlertText.Visible = false
-			showStatus("ESP | DISABLE", Color3.fromRGB(255, 0, 0))
-		end
+		toggleESP()
 	end
 
 	-- ===== TECLA C (AIMBOT) =====
 	if input.KeyCode == Enum.KeyCode.C then
-		aimbotEnabled = not aimbotEnabled
-		
-		if aimbotEnabled then
-			showStatus("AIMBOT | ENABLE", Color3.fromRGB(0, 255, 0))
-		else
-			showStatus("AIMBOT | DISABLE", Color3.fromRGB(255, 0, 0))
-		end
+		toggleAimbot()
 	end
 end)
