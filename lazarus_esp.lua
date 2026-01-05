@@ -1,21 +1,16 @@
-getgenv().ESP_ZOMBIES_SOURCE = [==[
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA
 -- Creator = Nobodxy85-bit
 -- Mejorado con persistencia entre servidores
 
--- ===== PERSISTENCIA TIPO NAMELESS =====
-getgenv().ESP_ZOMBIES_SOURCE = getgenv().ESP_ZOMBIES_SOURCE or [[
---[[ SCRIPT INSERTADO AUTOMÁTICAMENTE ]]
-]]  -- NO BORRAR
-
-getgenv().ESP_ZOMBIES_EXECUTED = getgenv().ESP_ZOMBIES_EXECUTED or false
-
-if getgenv().ESP_ZOMBIES_EXECUTED then
-	warn("ESP Zombies ya estaba ejecutado (nameless style)")
-	return
+-- ===== GUARDAR EN _G PARA PERSISTENCIA =====
+if not _G.ESP_ZOMBIES_CONFIG then
+	_G.ESP_ZOMBIES_CONFIG = {
+		espEnabled = false,
+		aimbotEnabled = false,
+		firstTimeKeyboard = true,
+		scriptLoaded = false
+	}
 end
-getgenv().ESP_ZOMBIES_EXECUTED = true
-
 
 -- ===== VERIFICAR SI YA EXISTE =====
 if _G.ESP_ZOMBIES_LOADED then
@@ -52,25 +47,21 @@ local zombieAddedConnection
 
 -- ===== FUNCIÓN DE AUTO-RECARGA =====
 local function setupAutoReload()
-	if not queue_on_teleport then
-		warn("queue_on_teleport no disponible")
-		return
-	end
-
-	player.OnTeleport:Connect(function(state)
-		if state == Enum.TeleportState.Started then
-			-- Guardar estados
+	-- Detectar cambio de servidor / teleport
+	player.OnTeleport:Connect(function(State)
+		if State == Enum.TeleportState.Started then
+			-- Guardar estado actual
 			_G.ESP_ZOMBIES_CONFIG.espEnabled = enabled
 			_G.ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
 			_G.ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
-
+			
+			-- Preparar script para auto-ejecutarse
 			queue_on_teleport([[
 				repeat task.wait() until game:IsLoaded()
-				task.wait(1)
-
-				if getgenv().ESP_ZOMBIES_SOURCE then
-					loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
-				end
+				task.wait(2)
+				
+				-- Recargar el script
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/nobodxy85-bit/project-lazarus-script-esp-2/refs/heads/main/lazarus_esp.lua", true))()
 			]])
 		end
 	end)
@@ -585,13 +576,10 @@ end)
 -- ===== ACTIVAR PERSISTENCIA =====
 setupAutoReload()
 
--- ===== AUTO REACTIVAR =====
-task.spawn(function()
-	task.wait(1)
-	if _G.ESP_ZOMBIES_CONFIG.espEnabled then
-		enableESP()
-	end
-end)
+-- ===== AUTO-ACTIVAR SI ESTABA ACTIVO =====
+if enabled then
+	enableESP()
+end
 
 print("✅ ESP Script con persistencia cargado!")
 print("📌 Controles:")
@@ -599,5 +587,3 @@ print("   T = Toggle ESP")
 print("   C = Toggle Aimbot")
 print("   H = Server Hop")
 print("   Botón 🔄 = Cambiar servidor")
-
-]==]
