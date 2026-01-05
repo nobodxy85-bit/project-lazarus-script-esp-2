@@ -1,5 +1,5 @@
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA
--- Creator = Nobodxy85-bit :D
+-- Creator = Nobodxy85-bit
 
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
@@ -25,10 +25,26 @@ local cachedBoxes = {}
 -- connections
 local zombieAddedConnection
 
+-- ===== VERIFICAR SI YA EXISTE =====
+if _G.ESP_ZOMBIES_LOADED then
+	warn("ESP Script ya está cargado. Usa el botón existente.")
+	return
+end
+_G.ESP_ZOMBIES_LOADED = true
+
 -- ===== GUI =====
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
+local ScreenGui = player:FindFirstChild("PlayerGui"):FindFirstChild("ESP_GUI")
+
+-- Si ya existe la GUI, la reutilizamos
+if not ScreenGui then
+	ScreenGui = Instance.new("ScreenGui")
+	ScreenGui.Name = "ESP_GUI"
+	ScreenGui.ResetOnSpawn = false
+	ScreenGui.Parent = player:WaitForChild("PlayerGui")
+else
+	-- Limpiar elementos antiguos si existen
+	ScreenGui:ClearAllChildren()
+end
 
 -- ALERTA
 local AlertText = Instance.new("TextLabel")
@@ -41,7 +57,7 @@ AlertText.TextSize = 30
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- BOTÓN CIRCULAR (REEMPLAZA StartText)
+-- BOTÓN CIRCULAR
 local CircleButton = Instance.new("TextButton")
 CircleButton.Size = UDim2.new(0, 80, 0, 80)
 CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
@@ -62,6 +78,42 @@ local UIStroke = Instance.new("UIStroke")
 UIStroke.Color = Color3.fromRGB(255, 255, 255)
 UIStroke.Thickness = 3
 UIStroke.Parent = CircleButton
+
+-- Hacer el botón arrastrable
+local dragging = false
+local dragInput, dragStart, startPos
+
+CircleButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = CircleButton.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+CircleButton.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		CircleButton.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
 
 -- MENU MÓVIL
 local MobileMenu = Instance.new("Frame")
@@ -355,7 +407,7 @@ AimbotButton.MouseButton1Click:Connect(function()
 end)
 
 -- ===== BUCLE PRINCIPAL =====
-RunService.RenderStepped:Connect(function()
+local renderConnection = RunService.RenderStepped:Connect(function()
 	-- ===== ALERTA ZOMBIES =====
 	if not enabled then
 		AlertText.Visible = false
@@ -401,7 +453,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ===== CONTROLES DE TECLADO (PC) =====
-UserInputService.InputBegan:Connect(function(input, gp)
+local inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
 	-- ===== TECLA T (ESP) =====
@@ -414,3 +466,15 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		toggleAimbot()
 	end
 end)
+
+-- ===== LIMPIEZA AL SALIR =====
+local function cleanup()
+	if renderConnection then renderConnection:Disconnect() end
+	if inputConnection then inputConnection:Disconnect() end
+	clearAll()
+end
+
+-- Conectar limpieza cuando el jugador sale
+player.CharacterRemoving:Connect(cleanup)
+
+print("ESP Script cargado exitosamente! Usa el botón de engranaje o T/C para controlar.")
