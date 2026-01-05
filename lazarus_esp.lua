@@ -1,5 +1,5 @@
 -- ===== GUARDAR CÓDIGO FUENTE PARA PERSISTENCIA =====
-getgenv().ESP_ZOMBIES_SOURCE = [[
+getgenv().ESP_ZOMBIES_SOURCE = [==[
 -- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA
 -- Creator = Nobodxy85-bit
 -- Mejorado con persistencia entre servidores
@@ -65,27 +65,24 @@ local function setupAutoReload()
 			getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
 			getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
 
-			-- Preparar el script para el siguiente servidor
-			queue_on_teleport([[
-				repeat task.wait() until game:IsLoaded()
-				task.wait(2)
-				
-				print("🔄 Recargando ESP Script...")
-				
-				if getgenv().ESP_ZOMBIES_SOURCE then
-					local success, err = pcall(function()
-						loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
-					end)
-					
-					if success then
-						print("✅ ESP Script recargado exitosamente!")
-					else
-						warn("❌ Error recargando ESP:", err)
-					end
-				else
-					warn("❌ No se encontró el código fuente del ESP")
-				end
-			]])
+			-- Preparar el script para el siguiente servidor (usando string concatenation en vez de [[]])
+			local code = "repeat task.wait() until game:IsLoaded()\n" ..
+				"task.wait(2)\n" ..
+				"print('🔄 Recargando ESP Script...')\n" ..
+				"if getgenv().ESP_ZOMBIES_SOURCE then\n" ..
+				"	local success, err = pcall(function()\n" ..
+				"		loadstring(getgenv().ESP_ZOMBIES_SOURCE)()\n" ..
+				"	end)\n" ..
+				"	if success then\n" ..
+				"		print('✅ ESP Script recargado exitosamente!')\n" ..
+				"	else\n" ..
+				"		warn('❌ Error recargando ESP:', err)\n" ..
+				"	end\n" ..
+				"else\n" ..
+				"	warn('❌ No se encontró el código fuente del ESP')\n" ..
+				"end"
+			
+			queue_on_teleport(code)
 		end
 	end)
 end
@@ -669,7 +666,7 @@ print("   H = Server Hop")
 print("   Botón ⚙️ = Abrir menú")
 print("   Botón 🔄 = Cambiar servidor")
 print("🔒 La GUI permanecerá visible incluso al morir")
-]]
+]==]
 
 -- ===== EJECUTAR EL SCRIPT =====
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
