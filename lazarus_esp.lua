@@ -1,8 +1,8 @@
 -- ===== GUARDAR CÓDIGO FUENTE PARA PERSISTENCIA =====
 getgenv().ESP_ZOMBIES_SOURCE = [==[
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA + SPEED HACK
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA + SPEED HACK + VIP SYSTEM
 -- Creator = Nobodxy85-bit
--- Mejorado con persistencia entre servidores y Speed Hack
+-- Mejorado con sistema VIP y funciones exclusivas
 
 -- ===== PERSISTENCIA TIPO NAMELESS =====
 if not getgenv().ESP_ZOMBIES_CONFIG then
@@ -12,7 +12,9 @@ if not getgenv().ESP_ZOMBIES_CONFIG then
 		speedHackEnabled = false,
 		speedValue = 16,
 		firstTimeKeyboard = true,
-		scriptLoaded = false
+		scriptLoaded = false,
+		killCount = 0,
+		showKills = false
 	}
 end
 
@@ -24,6 +26,11 @@ if _G.ESP_ZOMBIES_LOADED then
 end
 _G.ESP_ZOMBIES_LOADED = true
 
+-- ===== SISTEMA VIP (SOLO FUNCIONA CON M EN PC) =====
+local VIP_USER_IDS = {
+	10214014023 -- Para obtener tu ID: print(game.Players.LocalPlayer.UserId)
+}
+
 -- ===== SERVICIOS =====
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -32,6 +39,15 @@ local TeleportService = game:GetService("TeleportService")
 
 local player = Players.LocalPlayer
 
+-- ===== VERIFICAR SI ES VIP =====
+local isVIP = false
+for _, id in ipairs(VIP_USER_IDS) do
+	if player.UserId == id then
+		isVIP = true
+		break
+	end
+end
+
 -- ===== CONFIG =====
 local ALERT_DISTANCE = 20
 local enabled = getgenv().ESP_ZOMBIES_CONFIG.espEnabled
@@ -39,6 +55,8 @@ local aimbotEnabled = getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled
 local speedHackEnabled = getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled
 local speedValue = getgenv().ESP_ZOMBIES_CONFIG.speedValue
 local firstTimeKeyboard = getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard
+local killCount = getgenv().ESP_ZOMBIES_CONFIG.killCount
+local showKills = getgenv().ESP_ZOMBIES_CONFIG.showKills
 local Camera = workspace.CurrentCamera
 local AIM_FOV = 30
 local SMOOTHNESS = 0.15
@@ -58,8 +76,9 @@ local zombieAddedConnection
 local renderConnection
 local inputConnection
 local speedConnection
+local killCounterConnection
 
--- ===== FUNCIÓN DE AUTO-RECARGA (ESTILO INFINITE YIELD REAL) =====
+-- ===== FUNCIÓN DE AUTO-RECARGA =====
 local function setupAutoReload()
 	local queue =
 		queue_on_teleport
@@ -84,6 +103,8 @@ local function setupAutoReload()
 		getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
 		getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
 		getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+		getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+		getgenv().ESP_ZOMBIES_CONFIG.showKills = showKills
 
 		-- Código que se ejecutará EN EL NUEVO SERVER
 		local code = [[
@@ -119,6 +140,194 @@ if not ScreenGui then
 	print("🎨 GUI creada por primera vez")
 else
 	print("🎨 GUI encontrada - reutilizando")
+end
+
+-- ===== KILL COUNTER (SOLO PC) =====
+local KillCounterLabel = ScreenGui:FindFirstChild("KillCounterLabel")
+if not KillCounterLabel then
+	KillCounterLabel = Instance.new("TextLabel")
+	KillCounterLabel.Name = "KillCounterLabel"
+	KillCounterLabel.Size = UDim2.new(0, 200, 0, 60)
+	KillCounterLabel.Position = UDim2.new(0.5, -100, 0.02, 0)
+	KillCounterLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	KillCounterLabel.BackgroundTransparency = 0.3
+	KillCounterLabel.BorderSizePixel = 0
+	KillCounterLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+	KillCounterLabel.Font = Enum.Font.GothamBold
+	KillCounterLabel.TextSize = 28
+	KillCounterLabel.Visible = false
+	KillCounterLabel.Parent = ScreenGui
+
+	local KillCorner = Instance.new("UICorner")
+	KillCorner.CornerRadius = UDim.new(0, 12)
+	KillCorner.Parent = KillCounterLabel
+
+	local KillStroke = Instance.new("UIStroke")
+	KillStroke.Color = Color3.fromRGB(255, 215, 0)
+	KillStroke.Thickness = 3
+	KillStroke.Parent = KillCounterLabel
+end
+
+-- Actualizar texto del contador
+local function updateKillCounter()
+	if KillCounterLabel then
+		KillCounterLabel.Text = "💀 KILLS: " .. killCount
+	end
+end
+
+-- ===== VIP MENU (SOLO PC) =====
+local VIPMenu = ScreenGui:FindFirstChild("VIPMenu")
+if not VIPMenu and isVIP then
+	VIPMenu = Instance.new("Frame")
+	VIPMenu.Name = "VIPMenu"
+	VIPMenu.Size = UDim2.new(0, 250, 0, 200)
+	VIPMenu.Position = UDim2.new(0.02, 0, 0.3, 0)
+	VIPMenu.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+	VIPMenu.BackgroundTransparency = 0.1
+	VIPMenu.BorderSizePixel = 0
+	VIPMenu.Visible = false
+	VIPMenu.Parent = ScreenGui
+
+	local VIPCorner = Instance.new("UICorner")
+	VIPCorner.CornerRadius = UDim.new(0, 15)
+	VIPCorner.Parent = VIPMenu
+
+	local VIPStroke = Instance.new("UIStroke")
+	VIPStroke.Color = Color3.fromRGB(255, 0, 255)
+	VIPStroke.Thickness = 3
+	VIPStroke.Parent = VIPMenu
+
+	-- Título VIP
+	local VIPTitle = Instance.new("TextLabel")
+	VIPTitle.Name = "VIPTitle"
+	VIPTitle.Size = UDim2.new(1, 0, 0, 40)
+	VIPTitle.Position = UDim2.new(0, 0, 0, 0)
+	VIPTitle.BackgroundTransparency = 1
+	VIPTitle.Text = "👑 VIP MENU"
+	VIPTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+	VIPTitle.Font = Enum.Font.GothamBold
+	VIPTitle.TextSize = 20
+	VIPTitle.Parent = VIPMenu
+
+	-- Botón TP Mystery Box
+	local TPMysteryButton = Instance.new("TextButton")
+	TPMysteryButton.Name = "TPMysteryButton"
+	TPMysteryButton.Size = UDim2.new(0, 220, 0, 40)
+	TPMysteryButton.Position = UDim2.new(0.5, -110, 0, 50)
+	TPMysteryButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+	TPMysteryButton.Text = "📦 TP Mystery Box"
+	TPMysteryButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	TPMysteryButton.Font = Enum.Font.GothamBold
+	TPMysteryButton.TextSize = 16
+	TPMysteryButton.Parent = VIPMenu
+
+	local TPMysteryCorner = Instance.new("UICorner")
+	TPMysteryCorner.CornerRadius = UDim.new(0, 10)
+	TPMysteryCorner.Parent = TPMysteryButton
+
+	-- Botón TP Pack-a-Punch
+	local TPPackButton = Instance.new("TextButton")
+	TPPackButton.Name = "TPPackButton"
+	TPPackButton.Size = UDim2.new(0, 220, 0, 40)
+	TPPackButton.Position = UDim2.new(0.5, -110, 0, 100)
+	TPPackButton.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
+	TPPackButton.Text = "⚡ TP Pack-a-Punch"
+	TPPackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	TPPackButton.Font = Enum.Font.GothamBold
+	TPPackButton.TextSize = 16
+	TPPackButton.Parent = VIPMenu
+
+	local TPPackCorner = Instance.new("UICorner")
+	TPPackCorner.CornerRadius = UDim.new(0, 10)
+	TPPackCorner.Parent = TPPackButton
+
+	-- Botón Reset Kills
+	local ResetKillsButton = Instance.new("TextButton")
+	ResetKillsButton.Name = "ResetKillsButton"
+	ResetKillsButton.Size = UDim2.new(0, 220, 0, 40)
+	ResetKillsButton.Position = UDim2.new(0.5, -110, 0, 150)
+	ResetKillsButton.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+	ResetKillsButton.Text = "🔄 Reset Kills"
+	ResetKillsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	ResetKillsButton.Font = Enum.Font.GothamBold
+	ResetKillsButton.TextSize = 16
+	ResetKillsButton.Parent = VIPMenu
+
+	local ResetKillsCorner = Instance.new("UICorner")
+	ResetKillsCorner.CornerRadius = UDim.new(0, 10)
+	ResetKillsCorner.Parent = ResetKillsButton
+
+	-- ===== FUNCIONES VIP =====
+	
+	-- TP a Mystery Box
+	TPMysteryButton.MouseButton1Click:Connect(function()
+		local interact = workspace:FindFirstChild("Interact")
+		if not interact then
+			warn("❌ No se encontró la carpeta Interact")
+			return
+		end
+
+		local mysteryBox = interact:FindFirstChild("MysteryBox")
+		if not mysteryBox then
+			warn("❌ No se encontró Mystery Box")
+			return
+		end
+
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if not hrp then
+			warn("❌ No se encontró tu personaje")
+			return
+		end
+
+		-- Buscar la parte principal del Mystery Box
+		local targetPart = mysteryBox:FindFirstChild("Part") or mysteryBox:FindFirstChildWhichIsA("BasePart")
+		if targetPart then
+			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
+			print("✅ Teleportado a Mystery Box")
+		else
+			warn("❌ No se encontró la parte del Mystery Box")
+		end
+	end)
+
+	-- TP a Pack-a-Punch
+	TPPackButton.MouseButton1Click:Connect(function()
+		local interact = workspace:FindFirstChild("Interact")
+		if not interact then
+			warn("❌ No se encontró la carpeta Interact")
+			return
+		end
+
+		local packAPunch = interact:FindFirstChild("Pack-A-Punch")
+		if not packAPunch then
+			warn("❌ No se encontró Pack-a-Punch")
+			return
+		end
+
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if not hrp then
+			warn("❌ No se encontró tu personaje")
+			return
+		end
+
+		-- Buscar la parte principal del Pack-a-Punch
+		local targetPart = packAPunch:FindFirstChild("Part") or packAPunch:FindFirstChildWhichIsA("BasePart")
+		if targetPart then
+			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
+			print("✅ Teleportado a Pack-a-Punch")
+		else
+			warn("❌ No se encontró la parte del Pack-a-Punch")
+		end
+	end)
+
+	-- Reset Kills
+	ResetKillsButton.MouseButton1Click:Connect(function()
+		killCount = 0
+		getgenv().ESP_ZOMBIES_CONFIG.killCount = 0
+		updateKillCounter()
+		print("🔄 Contador de kills reseteado")
+	end)
 end
 
 -- ALERTA
@@ -197,7 +406,7 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- MENU MÓVIL (AHORA MÁS ALTO PARA INCLUIR SPEED HACK)
+-- MENU MÓVIL
 local MobileMenu = ScreenGui:FindFirstChild("MobileMenu")
 if not MobileMenu then
 	MobileMenu = Instance.new("Frame")
@@ -463,8 +672,8 @@ if not WelcomeText then
 	WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
 	WelcomeText.BackgroundTransparency = 0.3
 	WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	WelcomeText.Text = "Creator = Nobodxy85-bit  :D"
-	WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	WelcomeText.Text = isVIP and "Creator = Nobodxy85-bit  :D | 👑 VIP" or "Creator = Nobodxy85-bit  :D"
+	WelcomeText.TextColor3 = isVIP and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(255, 255, 255)
 	WelcomeText.TextTransparency = 0
 	WelcomeText.Font = Enum.Font.GothamBold
 	WelcomeText.TextSize = 18
@@ -549,6 +758,8 @@ local function serverHop()
 	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
 	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
 	getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
+	getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+	getgenv().ESP_ZOMBIES_CONFIG.showKills = showKills
 	
 	local success, errorMsg = pcall(function()
 		local servers = {}
@@ -604,7 +815,6 @@ local function getClosestZombieToCursor()
 end
 
 -- ===== SPEED HACK FUNCTIONS =====
--- ===== SPEED HACK MEJORADO (REEMPLAZO) =====
 local function applySpeed()
     local char = player.Character
     if char and char:FindFirstChildOfClass("Humanoid") then
@@ -647,6 +857,7 @@ local function toggleSpeedHack()
         SpeedButton.Text = "SPEED: OFF"
     end
 end
+
 local function increaseSpeed()
 	if speedValue < MAX_SPEED then
 		updateSlider(speedValue + SPEED_INCREMENT)
@@ -659,6 +870,41 @@ local function decreaseSpeed()
 		updateSlider(speedValue - SPEED_INCREMENT)
 		showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
 	end
+end
+
+-- ===== KILL COUNTER SYSTEM =====
+local function setupKillCounter()
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+
+	-- Monitorear la salud de los zombies
+	for _, zombie in ipairs(baddies:GetChildren()) do
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.Died:Connect(function()
+				if isVIP and showKills then
+					killCount = killCount + 1
+					getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+					updateKillCounter()
+				end
+			end)
+		end
+	end
+
+	-- Monitorear nuevos zombies
+	baddies.ChildAdded:Connect(function(zombie)
+		task.wait(0.1)
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.Died:Connect(function()
+				if isVIP and showKills then
+					killCount = killCount + 1
+					getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+					updateKillCounter()
+				end
+			end)
+		end
+	end)
 end
 
 -- ===== ESP (SOLO BORDES) =====
@@ -753,12 +999,25 @@ local function toggleESP(fromKeyboard)
 
 	if enabled then
 		enableESP()
+		-- Activar kill counter solo para VIP cuando se activa ESP
+		if isVIP then
+			showKills = true
+			getgenv().ESP_ZOMBIES_CONFIG.showKills = true
+			KillCounterLabel.Visible = true
+			updateKillCounter()
+		end
 		showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
 		ESPButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 		ESPButton.Text = "ESP: ON"
 	else
 		clearAll()
 		AlertText.Visible = false
+		-- Desactivar kill counter cuando se desactiva ESP
+		if isVIP then
+			showKills = false
+			getgenv().ESP_ZOMBIES_CONFIG.showKills = false
+			KillCounterLabel.Visible = false
+		end
 		showStatus("ESP | DISABLE", Color3.fromRGB(255, 0, 0))
 		ESPButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 		ESPButton.Text = "ESP: OFF"
@@ -881,6 +1140,24 @@ inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	if input.KeyCode == Enum.KeyCode.L then
 		decreaseSpeed()
 	end
+
+	-- ===== M PARA VERIFICAR SI ERES VIP =====
+	if input.KeyCode == Enum.KeyCode.M then
+		if isVIP then
+			if VIPMenu then
+				VIPMenu.Visible = not VIPMenu.Visible
+				if VIPMenu.Visible then
+					showStatus("👑 VIP MENU ABIERTO", Color3.fromRGB(255, 215, 0))
+				else
+					showStatus("👑 VIP MENU CERRADO", Color3.fromRGB(200, 200, 200))
+				end
+			end
+		else
+			showStatus("❌ NO ERES VIP | Tu ID: " .. player.UserId, Color3.fromRGB(255, 0, 0))
+			print("❌ Tu UserID es: " .. player.UserId)
+			print("⚠️ Agrega este ID a VIP_USER_IDS en el script para activar VIP")
+		end
+	end
 end)
 
 -- ===== LIMPIEZA SOLO CUANDO SE CIERRE ROBLOX =====
@@ -890,8 +1167,8 @@ local function cleanup()
 	if inputConnection then inputConnection:Disconnect() end
 	if zombieAddedConnection then zombieAddedConnection:Disconnect() end
 	if speedConnection then speedConnection:Disconnect() end
+	if killCounterConnection then killCounterConnection:Disconnect() end
 	clearAll()
-	resetSpeed()
 end
 
 -- Solo limpiar cuando el jugador se va del juego completamente
@@ -904,12 +1181,20 @@ end)
 -- ===== ACTIVAR PERSISTENCIA =====
 setupAutoReload()
 
+-- ===== SETUP KILL COUNTER =====
+setupKillCounter()
+
 -- ===== AUTO REACTIVAR SI ESTABA ENCENDIDO =====
 task.spawn(function()
 	task.wait(1)
 	if getgenv().ESP_ZOMBIES_CONFIG.espEnabled then
 		print("🔄 Reactivando ESP automáticamente...")
 		enableESP()
+		if isVIP then
+			showKills = true
+			KillCounterLabel.Visible = true
+			updateKillCounter()
+		end
 		showStatus("ESP | AUTO-ACTIVADO", Color3.fromRGB(0, 255, 0))
 	end
 	
@@ -919,14 +1204,23 @@ task.spawn(function()
 	end
 end)
 
-print("✅ ESP Script con persistencia y Speed Hack cargado!")
+print("✅ ESP Script con persistencia, Speed Hack y VIP System cargado!")
 print("📌 Controles:")
-print("   T = Toggle ESP")
+print("   T = Toggle ESP" .. (isVIP and " + Kill Counter 💀" or ""))
 print("   C = Toggle Aimbot")
-print("   V = Toggle Speed Hack")
-print("   + = Aumentar Velocidad")
-print("   - = Disminuir Velocidad")
+print("   E = Toggle Speed Hack")
+print("   K = Aumentar Velocidad")
+print("   L = Disminuir Velocidad")
 print("   H = Server Hop")
+print("   M = Verificar VIP Status")
+if isVIP then
+	print("   📦 TP Mystery Box (👑 VIP MENU)")
+	print("   ⚡ TP Pack-a-Punch (👑 VIP MENU)")
+	print("   🎯 Tu UserID: " .. player.UserId .. " ✅ VIP ACTIVO")
+	print("   💀 Kill Counter se activa automáticamente con ESP")
+else
+	print("   ⚠️ No eres VIP - Presiona M para ver tu UserID")
+end
 print("   Botón ⚙️ = Abrir menú")
 print("   Botón 🔄 = Cambiar servidor")
 print("🔒 La GUI permanecerá visible incluso al morir")
