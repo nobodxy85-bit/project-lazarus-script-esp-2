@@ -28,9 +28,7 @@ _G.ESP_ZOMBIES_LOADED = true
 
 -- ===== SISTEMA VIP (SOLO FUNCIONA CON M EN PC) =====
 local VIP_USER_IDS = {
-	123456789,  -- Reemplaza con tu UserID real
-	987654321,  -- Puedes agregar más IDs aquí
-	-- Para obtener tu ID: print(game.Players.LocalPlayer.UserId)
+	10214014023  -- Reemplaza con tu UserID real
 }
 
 -- ===== SERVICIOS =====
@@ -1192,3 +1190,4 @@ print("🔒 La GUI permanecerá visible incluso al morir")
 ]==]
 
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
+
