@@ -1,14 +1,16 @@
 -- ===== GUARDAR CÓDIGO FUENTE PARA PERSISTENCIA =====
 getgenv().ESP_ZOMBIES_SOURCE = [==[
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA
+-- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA + SPEED HACK
 -- Creator = Nobodxy85-bit
--- Mejorado con persistencia entre servidores
+-- Mejorado con persistencia entre servidores y Speed Hack
 
 -- ===== PERSISTENCIA TIPO NAMELESS =====
 if not getgenv().ESP_ZOMBIES_CONFIG then
 	getgenv().ESP_ZOMBIES_CONFIG = {
 		espEnabled = false,
 		aimbotEnabled = false,
+		speedHackEnabled = false,
+		speedValue = 16,
 		firstTimeKeyboard = true,
 		scriptLoaded = false
 	}
@@ -34,10 +36,17 @@ local player = Players.LocalPlayer
 local ALERT_DISTANCE = 20
 local enabled = getgenv().ESP_ZOMBIES_CONFIG.espEnabled
 local aimbotEnabled = getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled
+local speedHackEnabled = getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled
+local speedValue = getgenv().ESP_ZOMBIES_CONFIG.speedValue
 local firstTimeKeyboard = getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard
 local Camera = workspace.CurrentCamera
 local AIM_FOV = 30
 local SMOOTHNESS = 0.15
+
+-- Configuración Speed Hack
+local MIN_SPEED = 16
+local MAX_SPEED = 200
+local SPEED_INCREMENT = 5
 
 -- caches
 local espObjects = {}
@@ -48,6 +57,7 @@ local cachedBoxes = {}
 local zombieAddedConnection
 local renderConnection
 local inputConnection
+local speedConnection
 
 -- ===== FUNCIÓN DE AUTO-RECARGA (ESTILO INFINITE YIELD REAL) =====
 local function setupAutoReload()
@@ -71,6 +81,8 @@ local function setupAutoReload()
 		-- Guardar configuración
 		getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
 		getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+		getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
+		getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
 		getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
 
 		-- Código que se ejecutará EN EL NUEVO SERVER
@@ -185,13 +197,13 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- MENU MÓVIL
+-- MENU MÓVIL (AHORA MÁS ALTO PARA INCLUIR SPEED HACK)
 local MobileMenu = ScreenGui:FindFirstChild("MobileMenu")
 if not MobileMenu then
 	MobileMenu = Instance.new("Frame")
 	MobileMenu.Name = "MobileMenu"
-	MobileMenu.Size = UDim2.new(0, 280, 0, 260)
-	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -130)
+	MobileMenu.Size = UDim2.new(0, 280, 0, 380)
+	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -190)
 	MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 	MobileMenu.BackgroundTransparency = 0.1
 	MobileMenu.BorderSizePixel = 0
@@ -206,6 +218,10 @@ if not MobileMenu then
 	MenuStroke.Color = Color3.fromRGB(255, 255, 255)
 	MenuStroke.Thickness = 2
 	MenuStroke.Parent = MobileMenu
+else
+	-- Actualizar tamaño del menú existente
+	MobileMenu.Size = UDim2.new(0, 280, 0, 380)
+	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -190)
 end
 
 -- TÍTULO DEL MENÚ
@@ -265,13 +281,164 @@ end
 AimbotButton.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 AimbotButton.Text = aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF"
 
+-- ===== SPEED HACK CONTROLS =====
+
+-- BOTÓN SPEED HACK
+local SpeedButton = MobileMenu:FindFirstChild("SpeedButton")
+if not SpeedButton then
+	SpeedButton = Instance.new("TextButton")
+	SpeedButton.Name = "SpeedButton"
+	SpeedButton.Size = UDim2.new(0, 240, 0, 50)
+	SpeedButton.Position = UDim2.new(0.5, -120, 0, 175)
+	SpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	SpeedButton.Font = Enum.Font.GothamBold
+	SpeedButton.TextSize = 20
+	SpeedButton.Parent = MobileMenu
+
+	local SpeedCorner = Instance.new("UICorner")
+	SpeedCorner.CornerRadius = UDim.new(0, 10)
+	SpeedCorner.Parent = SpeedButton
+end
+
+-- Actualizar estado visual del botón Speed
+SpeedButton.BackgroundColor3 = speedHackEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+SpeedButton.Text = speedHackEnabled and "SPEED: ON" or "SPEED: OFF"
+
+-- LABEL SPEED VALUE
+local SpeedLabel = MobileMenu:FindFirstChild("SpeedLabel")
+if not SpeedLabel then
+	SpeedLabel = Instance.new("TextLabel")
+	SpeedLabel.Name = "SpeedLabel"
+	SpeedLabel.Size = UDim2.new(0, 240, 0, 25)
+	SpeedLabel.Position = UDim2.new(0.5, -120, 0, 235)
+	SpeedLabel.BackgroundTransparency = 1
+	SpeedLabel.Text = "Velocidad: " .. speedValue
+	SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	SpeedLabel.Font = Enum.Font.GothamBold
+	SpeedLabel.TextSize = 16
+	SpeedLabel.Parent = MobileMenu
+end
+
+-- SPEED SLIDER BACKGROUND
+local SliderBG = MobileMenu:FindFirstChild("SliderBG")
+if not SliderBG then
+	SliderBG = Instance.new("Frame")
+	SliderBG.Name = "SliderBG"
+	SliderBG.Size = UDim2.new(0, 240, 0, 10)
+	SliderBG.Position = UDim2.new(0.5, -120, 0, 268)
+	SliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	SliderBG.BorderSizePixel = 0
+	SliderBG.Parent = MobileMenu
+
+	local SliderCorner = Instance.new("UICorner")
+	SliderCorner.CornerRadius = UDim.new(0, 5)
+	SliderCorner.Parent = SliderBG
+end
+
+-- SPEED SLIDER FILL
+local SliderFill = SliderBG:FindFirstChild("SliderFill")
+if not SliderFill then
+	SliderFill = Instance.new("Frame")
+	SliderFill.Name = "SliderFill"
+	SliderFill.Size = UDim2.new((speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), 0, 1, 0)
+	SliderFill.Position = UDim2.new(0, 0, 0, 0)
+	SliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+	SliderFill.BorderSizePixel = 0
+	SliderFill.Parent = SliderBG
+
+	local FillCorner = Instance.new("UICorner")
+	FillCorner.CornerRadius = UDim.new(0, 5)
+	FillCorner.Parent = SliderFill
+end
+
+-- SPEED SLIDER BUTTON
+local SliderButton = SliderBG:FindFirstChild("SliderButton")
+if not SliderButton then
+	SliderButton = Instance.new("TextButton")
+	SliderButton.Name = "SliderButton"
+	SliderButton.Size = UDim2.new(0, 20, 0, 20)
+	SliderButton.Position = UDim2.new((speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), -10, 0.5, -10)
+	SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	SliderButton.BorderSizePixel = 0
+	SliderButton.Text = ""
+	SliderButton.Parent = SliderBG
+
+	local ButtonCorner = Instance.new("UICorner")
+	ButtonCorner.CornerRadius = UDim.new(1, 0)
+	ButtonCorner.Parent = SliderButton
+end
+
+-- Función para actualizar el slider
+local function updateSlider(value)
+	speedValue = math.clamp(value, MIN_SPEED, MAX_SPEED)
+	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
+	
+	local percent = (speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
+	SliderFill.Size = UDim2.new(percent, 0, 1, 0)
+	SliderButton.Position = UDim2.new(percent, -10, 0.5, -10)
+	SpeedLabel.Text = "Velocidad: " .. math.floor(speedValue)
+	
+	-- Actualizar velocidad si está activado
+	if speedHackEnabled then
+		local char = player.Character
+		if char then
+			local humanoid = char:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = speedValue
+			end
+		end
+	end
+end
+
+-- Hacer el slider arrastrable
+local sliderDragging = false
+
+SliderButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		sliderDragging = true
+	end
+end)
+
+SliderButton.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		sliderDragging = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local mousePos = input.Position.X
+		local sliderPos = SliderBG.AbsolutePosition.X
+		local sliderSize = SliderBG.AbsoluteSize.X
+		
+		local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+		local newSpeed = MIN_SPEED + (percent * (MAX_SPEED - MIN_SPEED))
+		
+		updateSlider(newSpeed)
+	end
+end)
+
+-- Click en la barra para cambiar velocidad
+SliderBG.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		local mousePos = input.Position.X
+		local sliderPos = SliderBG.AbsolutePosition.X
+		local sliderSize = SliderBG.AbsoluteSize.X
+		
+		local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+		local newSpeed = MIN_SPEED + (percent * (MAX_SPEED - MIN_SPEED))
+		
+		updateSlider(newSpeed)
+	end
+end)
+
 -- BOTÓN SERVER HOP
 local ServerHopButton = MobileMenu:FindFirstChild("ServerHopButton")
 if not ServerHopButton then
 	ServerHopButton = Instance.new("TextButton")
 	ServerHopButton.Name = "ServerHopButton"
 	ServerHopButton.Size = UDim2.new(0, 240, 0, 50)
-	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 175)
+	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 295)
 	ServerHopButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
 	ServerHopButton.Text = "🔄 CAMBIAR SERVER"
 	ServerHopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -282,6 +449,9 @@ if not ServerHopButton then
 	local ServerHopCorner = Instance.new("UICorner")
 	ServerHopCorner.CornerRadius = UDim.new(0, 10)
 	ServerHopCorner.Parent = ServerHopButton
+else
+	-- Actualizar posición del botón existente
+	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 295)
 end
 
 -- TEXTO DE BIENVENIDA
@@ -376,6 +546,8 @@ local function serverHop()
 	-- Guardar estado antes de cambiar
 	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
 	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
 	getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
 	
 	local success, errorMsg = pcall(function()
@@ -429,6 +601,99 @@ local function getClosestZombieToCursor()
 	end
 
 	return closest
+end
+
+-- ===== SPEED HACK FUNCTIONS =====
+local function applySpeed()
+	local char = player.Character
+	if char then
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = speedValue
+		end
+	end
+end
+
+local function resetSpeed()
+	local char = player.Character
+	if char then
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = 16
+		end
+	end
+end
+
+local function toggleSpeedHack()
+	speedHackEnabled = not speedHackEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
+	
+	if speedHackEnabled then
+		applySpeed()
+		showStatus("SPEED HACK | ENABLE (" .. math.floor(speedValue) .. ")", Color3.fromRGB(0, 255, 0))
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+		SpeedButton.Text = "SPEED: ON"
+		
+		-- Mantener velocidad actualizada
+		if speedConnection then speedConnection:Disconnect() end
+		speedConnection = RunService.Heartbeat:Connect(function()
+			if speedHackEnabled then
+				local char = player.Character
+				if char then
+					local humanoid = char:FindFirstChildOfClass("Humanoid")
+					if humanoid and humanoid.WalkSpeed ~= speedValue then
+						humanoid.WalkSpeed = speedValue
+					end
+				end
+			end
+		end)
+		
+		-- También aplicar al respawnear
+		player.CharacterAdded:Connect(function(char)
+			if speedHackEnabled then
+				task.wait(0.5)
+				local humanoid = char:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					humanoid.WalkSpeed = speedValue
+				end
+			end
+		end)
+	else
+		if speedConnection then 
+			speedConnection:Disconnect()
+			speedConnection = nil
+		end
+		resetSpeed()
+		showStatus("SPEED HACK | DISABLE", Color3.fromRGB(255, 0, 0))
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		SpeedButton.Text = "SPEED: OFF"
+	end
+end
+
+local function increaseSpeed()
+	if speedValue < MAX_SPEED then
+		updateSlider(speedValue + SPEED_INCREMENT)
+		if speedHackEnabled then
+			showStatus("⬆️ Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 255, 0))
+		else
+			showStatus("Velocidad: " .. math.floor(speedValue) .. " (Activa Speed Hack)", Color3.fromRGB(255, 200, 0))
+		end
+	else
+		showStatus("⚠️ Velocidad máxima alcanzada", Color3.fromRGB(255, 100, 0))
+	end
+end
+
+local function decreaseSpeed()
+	if speedValue > MIN_SPEED then
+		updateSlider(speedValue - SPEED_INCREMENT)
+		if speedHackEnabled then
+			showStatus("⬇️ Velocidad: " .. math.floor(speedValue), Color3.fromRGB(255, 150, 0))
+		else
+			showStatus("Velocidad: " .. math.floor(speedValue) .. " (Activa Speed Hack)", Color3.fromRGB(255, 200, 0))
+		end
+	else
+		showStatus("⚠️ Velocidad mínima alcanzada", Color3.fromRGB(255, 100, 0))
+	end
 end
 
 -- ===== ESP (SOLO BORDES) =====
@@ -572,6 +837,10 @@ AimbotButton.MouseButton1Click:Connect(function()
 	toggleAimbot()
 end)
 
+SpeedButton.MouseButton1Click:Connect(function()
+	toggleSpeedHack()
+end)
+
 ServerHopButton.MouseButton1Click:Connect(function()
 	serverHop()
 end)
@@ -623,16 +892,37 @@ end)
 inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
+	-- ESP Toggle
 	if input.KeyCode == Enum.KeyCode.T then
 		toggleESP(true)
 	end
 
+	-- Aimbot Toggle
 	if input.KeyCode == Enum.KeyCode.C then
 		toggleAimbot()
 	end
 	
+	-- Server Hop
 	if input.KeyCode == Enum.KeyCode.H then
 		serverHop()
+	end
+	
+	-- Speed Hack Toggle
+	if input.KeyCode == Enum.KeyCode.E then
+		toggleSpeedHack()
+	end
+	
+	-- Aumentar velocidad (+ y teclas del numpad)
+	if input.KeyCode == Enum.KeyCode.Equals or 
+	   input.KeyCode == Enum.KeyCode.Plus or 
+	   input.KeyCode == Enum.KeyCode.KeypadPlus then
+		increaseSpeed()
+	end
+	
+	-- Disminuir velocidad (- y teclas del numpad)
+	if input.KeyCode == Enum.KeyCode.Minus or 
+	   input.KeyCode == Enum.KeyCode.KeypadMinus then
+		decreaseSpeed()
 	end
 end)
 
@@ -642,7 +932,9 @@ local function cleanup()
 	if renderConnection then renderConnection:Disconnect() end
 	if inputConnection then inputConnection:Disconnect() end
 	if zombieAddedConnection then zombieAddedConnection:Disconnect() end
+	if speedConnection then speedConnection:Disconnect() end
 	clearAll()
+	resetSpeed()
 end
 
 -- Solo limpiar cuando el jugador se va del juego completamente
@@ -663,17 +955,24 @@ task.spawn(function()
 		enableESP()
 		showStatus("ESP | AUTO-ACTIVADO", Color3.fromRGB(0, 255, 0))
 	end
+	
+	if getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled then
+		print("🔄 Reactivando Speed Hack automáticamente...")
+		toggleSpeedHack()
+	end
 end)
 
-print("✅ ESP Script con persistencia cargado!")
-print("📌 Controles:")
+print("✅ ESP Script con persistencia y Speed Hack cargado!")
+print("📌 Controles de Teclado:")
 print("   T = Toggle ESP")
 print("   C = Toggle Aimbot")
+print("   V = Toggle Speed Hack")
+print("   + o = = Aumentar Velocidad")
+print("   - = Disminuir Velocidad")
 print("   H = Server Hop")
-print("   Botón ⚙️ = Abrir menú")
-print("   Botón 🔄 = Cambiar servidor")
+print("   Botón ⚙️ = Abrir menú (solo móvil)")
+print("🎮 Velocidad actual: " .. speedValue)
 print("🔒 La GUI permanecerá visible incluso al morir")
 ]==]
 
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
-
