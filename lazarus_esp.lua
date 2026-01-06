@@ -604,95 +604,60 @@ local function getClosestZombieToCursor()
 end
 
 -- ===== SPEED HACK FUNCTIONS =====
+-- ===== SPEED HACK MEJORADO (REEMPLAZO) =====
 local function applySpeed()
-	local char = player.Character
-	if char then
-		local humanoid = char:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = speedValue
-		end
-	end
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        char:FindFirstChildOfClass("Humanoid").WalkSpeed = speedValue
+    end
 end
 
-local function resetSpeed()
-	local char = player.Character
-	if char then
-		local humanoid = char:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = 16
-		end
-	end
-end
+-- Esto fuerza la velocidad en cada frame para que el juego no la baje
+if speedConnection then speedConnection:Disconnect() end
+speedConnection = RunService.Heartbeat:Connect(function()
+    if speedHackEnabled then
+        applySpeed()
+    end
+end)
+
+-- Esto asegura que funcione cuando mueras y reaparezcas
+player.CharacterAdded:Connect(function()
+    if speedHackEnabled then
+        task.wait(1) -- Espera a que el server cargue el personaje
+        applySpeed()
+    end
+end)
 
 local function toggleSpeedHack()
-	speedHackEnabled = not speedHackEnabled
-	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
-	
-	if speedHackEnabled then
-		applySpeed()
-		showStatus("SPEED HACK | ENABLE (" .. math.floor(speedValue) .. ")", Color3.fromRGB(0, 255, 0))
-		SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-		SpeedButton.Text = "SPEED: ON"
-		
-		-- Mantener velocidad actualizada
-		if speedConnection then speedConnection:Disconnect() end
-		speedConnection = RunService.Heartbeat:Connect(function()
-			if speedHackEnabled then
-				local char = player.Character
-				if char then
-					local humanoid = char:FindFirstChildOfClass("Humanoid")
-					if humanoid and humanoid.WalkSpeed ~= speedValue then
-						humanoid.WalkSpeed = speedValue
-					end
-				end
-			end
-		end)
-		
-		-- También aplicar al respawnear
-		player.CharacterAdded:Connect(function(char)
-			if speedHackEnabled then
-				task.wait(0.5)
-				local humanoid = char:FindFirstChildOfClass("Humanoid")
-				if humanoid then
-					humanoid.WalkSpeed = speedValue
-				end
-			end
-		end)
-	else
-		if speedConnection then 
-			speedConnection:Disconnect()
-			speedConnection = nil
-		end
-		resetSpeed()
-		showStatus("SPEED HACK | DISABLE", Color3.fromRGB(255, 0, 0))
-		SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-		SpeedButton.Text = "SPEED: OFF"
-	end
+    speedHackEnabled = not speedHackEnabled
+    getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
+    
+    if speedHackEnabled then
+        applySpeed()
+        showStatus("SPEED HACK | ON", Color3.fromRGB(0, 255, 0))
+        SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        SpeedButton.Text = "SPEED: ON"
+    else
+        local char = player.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+        end
+        showStatus("SPEED HACK | OFF", Color3.fromRGB(255, 0, 0))
+        SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        SpeedButton.Text = "SPEED: OFF"
+    end
 end
-
 local function increaseSpeed()
 	if speedValue < MAX_SPEED then
 		updateSlider(speedValue + SPEED_INCREMENT)
-		if speedHackEnabled then
-			showStatus("⬆️ Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 255, 0))
-		else
-			showStatus("Velocidad: " .. math.floor(speedValue) .. " (Activa Speed Hack)", Color3.fromRGB(255, 200, 0))
-		end
-	else
-		showStatus("⚠️ Velocidad máxima alcanzada", Color3.fromRGB(255, 100, 0))
+		showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
 	end
 end
 
 local function decreaseSpeed()
 	if speedValue > MIN_SPEED then
 		updateSlider(speedValue - SPEED_INCREMENT)
-		if speedHackEnabled then
-			showStatus("⬇️ Velocidad: " .. math.floor(speedValue), Color3.fromRGB(255, 150, 0))
-		else
-			showStatus("Velocidad: " .. math.floor(speedValue) .. " (Activa Speed Hack)", Color3.fromRGB(255, 200, 0))
-		end
-	else
-		showStatus("⚠️ Velocidad mínima alcanzada", Color3.fromRGB(255, 100, 0))
+		showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
 	end
 end
 
@@ -892,36 +857,28 @@ end)
 inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
-	-- ESP Toggle
 	if input.KeyCode == Enum.KeyCode.T then
 		toggleESP(true)
 	end
 
-	-- Aimbot Toggle
 	if input.KeyCode == Enum.KeyCode.C then
 		toggleAimbot()
 	end
 	
-	-- Server Hop
 	if input.KeyCode == Enum.KeyCode.H then
 		serverHop()
 	end
 	
-	-- Speed Hack Toggle
 	if input.KeyCode == Enum.KeyCode.E then
 		toggleSpeedHack()
 	end
 	
-	-- Aumentar velocidad (+ y teclas del numpad)
-	if input.KeyCode == Enum.KeyCode.Equals or 
-	   input.KeyCode == Enum.KeyCode.Plus or 
-	   input.KeyCode == Enum.KeyCode.KeypadPlus then
+	-- Control de velocidad con + y -
+	if input.KeyCode == Enum.KeyCode.Equals or input.KeyCode == Enum.KeyCode.K then
 		increaseSpeed()
 	end
 	
-	-- Disminuir velocidad (- y teclas del numpad)
-	if input.KeyCode == Enum.KeyCode.Minus or 
-	   input.KeyCode == Enum.KeyCode.KeypadMinus then
+	if input.KeyCode == Enum.KeyCode.L then
 		decreaseSpeed()
 	end
 end)
@@ -963,15 +920,15 @@ task.spawn(function()
 end)
 
 print("✅ ESP Script con persistencia y Speed Hack cargado!")
-print("📌 Controles de Teclado:")
+print("📌 Controles:")
 print("   T = Toggle ESP")
 print("   C = Toggle Aimbot")
 print("   V = Toggle Speed Hack")
-print("   + o = = Aumentar Velocidad")
+print("   + = Aumentar Velocidad")
 print("   - = Disminuir Velocidad")
 print("   H = Server Hop")
-print("   Botón ⚙️ = Abrir menú (solo móvil)")
-print("🎮 Velocidad actual: " .. speedValue)
+print("   Botón ⚙️ = Abrir menú")
+print("   Botón 🔄 = Cambiar servidor")
 print("🔒 La GUI permanecerá visible incluso al morir")
 ]==]
 
