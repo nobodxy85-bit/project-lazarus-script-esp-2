@@ -28,7 +28,9 @@ _G.ESP_ZOMBIES_LOADED = true
 
 -- ===== SISTEMA VIP (SOLO FUNCIONA CON M EN PC) =====
 local VIP_USER_IDS = {
-	10214014023 -- Para obtener tu ID: print(game.Players.LocalPlayer.UserId)
+	123456789,  -- Reemplaza con tu UserID real
+	987654321,  -- Puedes agregar más IDs aquí
+	-- Para obtener tu ID: print(game.Players.LocalPlayer.UserId)
 }
 
 -- ===== SERVICIOS =====
@@ -147,25 +149,17 @@ local KillCounterLabel = ScreenGui:FindFirstChild("KillCounterLabel")
 if not KillCounterLabel then
 	KillCounterLabel = Instance.new("TextLabel")
 	KillCounterLabel.Name = "KillCounterLabel"
-	KillCounterLabel.Size = UDim2.new(0, 200, 0, 60)
-	KillCounterLabel.Position = UDim2.new(0.5, -100, 0.02, 0)
-	KillCounterLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	KillCounterLabel.BackgroundTransparency = 0.3
+	KillCounterLabel.Size = UDim2.new(0, 150, 0, 35)
+	KillCounterLabel.Position = UDim2.new(0.5, -75, 0.02, 0)
+	KillCounterLabel.BackgroundTransparency = 1
 	KillCounterLabel.BorderSizePixel = 0
 	KillCounterLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 	KillCounterLabel.Font = Enum.Font.GothamBold
-	KillCounterLabel.TextSize = 28
+	KillCounterLabel.TextSize = 22
+	KillCounterLabel.TextStrokeTransparency = 0.5
+	KillCounterLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 	KillCounterLabel.Visible = false
 	KillCounterLabel.Parent = ScreenGui
-
-	local KillCorner = Instance.new("UICorner")
-	KillCorner.CornerRadius = UDim.new(0, 12)
-	KillCorner.Parent = KillCounterLabel
-
-	local KillStroke = Instance.new("UIStroke")
-	KillStroke.Color = Color3.fromRGB(255, 215, 0)
-	KillStroke.Thickness = 3
-	KillStroke.Parent = KillCounterLabel
 end
 
 -- Actualizar texto del contador
@@ -175,159 +169,101 @@ local function updateKillCounter()
 	end
 end
 
--- ===== VIP MENU (SOLO PC) =====
-local VIPMenu = ScreenGui:FindFirstChild("VIPMenu")
-if not VIPMenu and isVIP then
-	VIPMenu = Instance.new("Frame")
-	VIPMenu.Name = "VIPMenu"
-	VIPMenu.Size = UDim2.new(0, 250, 0, 200)
-	VIPMenu.Position = UDim2.new(0.02, 0, 0.3, 0)
-	VIPMenu.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
-	VIPMenu.BackgroundTransparency = 0.1
-	VIPMenu.BorderSizePixel = 0
-	VIPMenu.Visible = false
-	VIPMenu.Parent = ScreenGui
+-- ===== VIP TELEPORT SYSTEM (SIN GUI - SOLO TECLADO) =====
+local currentTPOption = 1 -- 1 = Sin TP, 2 = Pack-a-Punch, 3 = Mystery Box
+local TPOptions = {
+	"SIN TP",
+	"PACK-A-PUNCH",
+	"MYSTERY BOX"
+}
 
-	local VIPCorner = Instance.new("UICorner")
-	VIPCorner.CornerRadius = UDim.new(0, 15)
-	VIPCorner.Parent = VIPMenu
+-- Label para mostrar opción actual
+local TPSelectorLabel = ScreenGui:FindFirstChild("TPSelectorLabel")
+if isVIP and not TPSelectorLabel then
+	TPSelectorLabel = Instance.new("TextLabel")
+	TPSelectorLabel.Name = "TPSelectorLabel"
+	TPSelectorLabel.Size = UDim2.new(0, 200, 0, 30)
+	TPSelectorLabel.Position = UDim2.new(0.02, 0, 0.3, 0)
+	TPSelectorLabel.BackgroundTransparency = 1
+	TPSelectorLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+	TPSelectorLabel.Font = Enum.Font.GothamBold
+	TPSelectorLabel.TextSize = 18
+	TPSelectorLabel.TextStrokeTransparency = 0.5
+	TPSelectorLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	TPSelectorLabel.TextXAlignment = Enum.TextXAlignment.Left
+	TPSelectorLabel.Visible = false
+	TPSelectorLabel.Parent = ScreenGui
+end
 
-	local VIPStroke = Instance.new("UIStroke")
-	VIPStroke.Color = Color3.fromRGB(255, 0, 255)
-	VIPStroke.Thickness = 3
-	VIPStroke.Parent = VIPMenu
+-- Función para actualizar el texto del selector
+local function updateTPSelector()
+	if TPSelectorLabel then
+		TPSelectorLabel.Text = "TP: " .. TPOptions[currentTPOption]
+	end
+end
 
-	-- Título VIP
-	local VIPTitle = Instance.new("TextLabel")
-	VIPTitle.Name = "VIPTitle"
-	VIPTitle.Size = UDim2.new(1, 0, 0, 40)
-	VIPTitle.Position = UDim2.new(0, 0, 0, 0)
-	VIPTitle.BackgroundTransparency = 1
-	VIPTitle.Text = "👑 VIP MENU"
-	VIPTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-	VIPTitle.Font = Enum.Font.GothamBold
-	VIPTitle.TextSize = 20
-	VIPTitle.Parent = VIPMenu
+-- Función para cambiar opción de TP
+local function cycleTPOption()
+	currentTPOption = currentTPOption + 1
+	if currentTPOption > #TPOptions then
+		currentTPOption = 1
+	end
+	updateTPSelector()
+	showStatus("TP: " .. TPOptions[currentTPOption], Color3.fromRGB(255, 215, 0))
+end
 
-	-- Botón TP Mystery Box
-	local TPMysteryButton = Instance.new("TextButton")
-	TPMysteryButton.Name = "TPMysteryButton"
-	TPMysteryButton.Size = UDim2.new(0, 220, 0, 40)
-	TPMysteryButton.Position = UDim2.new(0.5, -110, 0, 50)
-	TPMysteryButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-	TPMysteryButton.Text = "📦 TP Mystery Box"
-	TPMysteryButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	TPMysteryButton.Font = Enum.Font.GothamBold
-	TPMysteryButton.TextSize = 16
-	TPMysteryButton.Parent = VIPMenu
+-- Función para ejecutar TP según opción seleccionada
+local function executeTP()
+	if currentTPOption == 1 then
+		showStatus("❌ Sin TP seleccionado", Color3.fromRGB(255, 100, 0))
+		return
+	end
 
-	local TPMysteryCorner = Instance.new("UICorner")
-	TPMysteryCorner.CornerRadius = UDim.new(0, 10)
-	TPMysteryCorner.Parent = TPMysteryButton
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		showStatus("❌ No se encontró tu personaje", Color3.fromRGB(255, 0, 0))
+		return
+	end
 
-	-- Botón TP Pack-a-Punch
-	local TPPackButton = Instance.new("TextButton")
-	TPPackButton.Name = "TPPackButton"
-	TPPackButton.Size = UDim2.new(0, 220, 0, 40)
-	TPPackButton.Position = UDim2.new(0.5, -110, 0, 100)
-	TPPackButton.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
-	TPPackButton.Text = "⚡ TP Pack-a-Punch"
-	TPPackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	TPPackButton.Font = Enum.Font.GothamBold
-	TPPackButton.TextSize = 16
-	TPPackButton.Parent = VIPMenu
+	local interact = workspace:FindFirstChild("Interact")
+	if not interact then
+		showStatus("❌ No se encontró la carpeta Interact", Color3.fromRGB(255, 0, 0))
+		return
+	end
 
-	local TPPackCorner = Instance.new("UICorner")
-	TPPackCorner.CornerRadius = UDim.new(0, 10)
-	TPPackCorner.Parent = TPPackButton
-
-	-- Botón Reset Kills
-	local ResetKillsButton = Instance.new("TextButton")
-	ResetKillsButton.Name = "ResetKillsButton"
-	ResetKillsButton.Size = UDim2.new(0, 220, 0, 40)
-	ResetKillsButton.Position = UDim2.new(0.5, -110, 0, 150)
-	ResetKillsButton.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-	ResetKillsButton.Text = "🔄 Reset Kills"
-	ResetKillsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	ResetKillsButton.Font = Enum.Font.GothamBold
-	ResetKillsButton.TextSize = 16
-	ResetKillsButton.Parent = VIPMenu
-
-	local ResetKillsCorner = Instance.new("UICorner")
-	ResetKillsCorner.CornerRadius = UDim.new(0, 10)
-	ResetKillsCorner.Parent = ResetKillsButton
-
-	-- ===== FUNCIONES VIP =====
-	
-	-- TP a Mystery Box
-	TPMysteryButton.MouseButton1Click:Connect(function()
-		local interact = workspace:FindFirstChild("Interact")
-		if not interact then
-			warn("❌ No se encontró la carpeta Interact")
-			return
-		end
-
-		local mysteryBox = interact:FindFirstChild("MysteryBox")
-		if not mysteryBox then
-			warn("❌ No se encontró Mystery Box")
-			return
-		end
-
-		local char = player.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		if not hrp then
-			warn("❌ No se encontró tu personaje")
-			return
-		end
-
-		-- Buscar la parte principal del Mystery Box
-		local targetPart = mysteryBox:FindFirstChild("Part") or mysteryBox:FindFirstChildWhichIsA("BasePart")
-		if targetPart then
-			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
-			print("✅ Teleportado a Mystery Box")
-		else
-			warn("❌ No se encontró la parte del Mystery Box")
-		end
-	end)
-
-	-- TP a Pack-a-Punch
-	TPPackButton.MouseButton1Click:Connect(function()
-		local interact = workspace:FindFirstChild("Interact")
-		if not interact then
-			warn("❌ No se encontró la carpeta Interact")
-			return
-		end
-
+	if currentTPOption == 2 then
+		-- TP a Pack-a-Punch
 		local packAPunch = interact:FindFirstChild("Pack-A-Punch")
 		if not packAPunch then
-			warn("❌ No se encontró Pack-a-Punch")
+			showStatus("❌ No se encontró Pack-a-Punch", Color3.fromRGB(255, 0, 0))
 			return
 		end
 
-		local char = player.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		if not hrp then
-			warn("❌ No se encontró tu personaje")
-			return
-		end
-
-		-- Buscar la parte principal del Pack-a-Punch
 		local targetPart = packAPunch:FindFirstChild("Part") or packAPunch:FindFirstChildWhichIsA("BasePart")
 		if targetPart then
 			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
-			print("✅ Teleportado a Pack-a-Punch")
+			showStatus("✅ TP a Pack-a-Punch", Color3.fromRGB(0, 255, 0))
 		else
-			warn("❌ No se encontró la parte del Pack-a-Punch")
+			showStatus("❌ No se encontró la parte del Pack-a-Punch", Color3.fromRGB(255, 0, 0))
 		end
-	end)
 
-	-- Reset Kills
-	ResetKillsButton.MouseButton1Click:Connect(function()
-		killCount = 0
-		getgenv().ESP_ZOMBIES_CONFIG.killCount = 0
-		updateKillCounter()
-		print("🔄 Contador de kills reseteado")
-	end)
+	elseif currentTPOption == 3 then
+		-- TP a Mystery Box
+		local mysteryBox = interact:FindFirstChild("MysteryBox")
+		if not mysteryBox then
+			showStatus("❌ No se encontró Mystery Box", Color3.fromRGB(255, 0, 0))
+			return
+		end
+
+		local targetPart = mysteryBox:FindFirstChild("Part") or mysteryBox:FindFirstChildWhichIsA("BasePart")
+		if targetPart then
+			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
+			showStatus("✅ TP a Mystery Box", Color3.fromRGB(0, 255, 0))
+		else
+			showStatus("❌ No se encontró la parte del Mystery Box", Color3.fromRGB(255, 0, 0))
+		end
+	end
 end
 
 -- ALERTA
@@ -1144,18 +1080,46 @@ inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
 	-- ===== M PARA VERIFICAR SI ERES VIP =====
 	if input.KeyCode == Enum.KeyCode.M then
 		if isVIP then
-			if VIPMenu then
-				VIPMenu.Visible = not VIPMenu.Visible
-				if VIPMenu.Visible then
-					showStatus("👑 VIP MENU ABIERTO", Color3.fromRGB(255, 215, 0))
-				else
-					showStatus("👑 VIP MENU CERRADO", Color3.fromRGB(200, 200, 200))
-				end
-			end
+			showStatus("👑 VIP ACTIVO | ID: " .. player.UserId, Color3.fromRGB(255, 215, 0))
+			print("👑 Eres VIP")
+			print("📌 Y = Cambiar opción de TP")
+			print("📌 Z = Ejecutar TP")
+			print("📌 R = Reset Kills")
 		else
 			showStatus("❌ NO ERES VIP | Tu ID: " .. player.UserId, Color3.fromRGB(255, 0, 0))
 			print("❌ Tu UserID es: " .. player.UserId)
 			print("⚠️ Agrega este ID a VIP_USER_IDS en el script para activar VIP")
+		end
+	end
+
+	-- ===== VIP TELEPORT CONTROLS =====
+	if isVIP then
+		-- Y = Cambiar opción de TP
+		if input.KeyCode == Enum.KeyCode.Y then
+			cycleTPOption()
+			if TPSelectorLabel then
+				TPSelectorLabel.Visible = true
+				-- Auto-ocultar después de 3 segundos
+				task.spawn(function()
+					task.wait(3)
+					if TPSelectorLabel then
+						TPSelectorLabel.Visible = false
+					end
+				end)
+			end
+		end
+
+		-- Z = Ejecutar TP
+		if input.KeyCode == Enum.KeyCode.Z then
+			executeTP()
+		end
+
+		-- P = Reset Kills
+		if input.KeyCode == Enum.KeyCode.P then
+			killCount = 0
+			getgenv().ESP_ZOMBIES_CONFIG.killCount = 0
+			updateKillCounter()
+			showStatus("🔄 Kills reseteados", Color3.fromRGB(0, 255, 255))
 		end
 	end
 end)
@@ -1214,8 +1178,9 @@ print("   L = Disminuir Velocidad")
 print("   H = Server Hop")
 print("   M = Verificar VIP Status")
 if isVIP then
-	print("   📦 TP Mystery Box (👑 VIP MENU)")
-	print("   ⚡ TP Pack-a-Punch (👑 VIP MENU)")
+	print("   Y = Cambiar opción de TP (👑 VIP)")
+	print("   Z = Ejecutar TP (👑 VIP)")
+	print("   R = Reset Kills (👑 VIP)")
 	print("   🎯 Tu UserID: " .. player.UserId .. " ✅ VIP ACTIVO")
 	print("   💀 Kill Counter se activa automáticamente con ESP")
 else
