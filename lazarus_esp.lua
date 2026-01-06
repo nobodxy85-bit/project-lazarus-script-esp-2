@@ -1,10 +1,10 @@
 -- ===== GUARDAR CÓDIGO FUENTE PARA PERSISTENCIA =====
 getgenv().ESP_ZOMBIES_SOURCE = [==[
--- ESP ZOMBIES + ESP MYSTERY BOX + ALERTA + PERSISTENCIA + SPEED HACK + VIP SYSTEM
+-- ESP ZOMBIES OPTIMIZADO + VIP SYSTEM
 -- Creator = Nobodxy85-bit
--- Mejorado con sistema VIP y funciones exclusivas
+-- Versión optimizada con mejor rendimiento
 
--- ===== PERSISTENCIA TIPO NAMELESS =====
+-- ===== PERSISTENCIA =====
 if not getgenv().ESP_ZOMBIES_CONFIG then
 	getgenv().ESP_ZOMBIES_CONFIG = {
 		espEnabled = false,
@@ -12,23 +12,20 @@ if not getgenv().ESP_ZOMBIES_CONFIG then
 		speedHackEnabled = false,
 		speedValue = 16,
 		firstTimeKeyboard = true,
-		scriptLoaded = false,
 		killCount = 0,
 		showKills = false
 	}
 end
 
--- ===== VERIFICAR SI YA EXISTE EN ESTE SERVIDOR =====
 if _G.ESP_ZOMBIES_LOADED then
-	warn("⚠️ ESP Script ya está cargado en este servidor.")
-	warn("✅ Usa el botón de engranaje ⚙️ para controlar el ESP")
+	warn("⚠️ ESP Script ya está cargado")
 	return
 end
 _G.ESP_ZOMBIES_LOADED = true
 
--- ===== SISTEMA VIP (SOLO FUNCIONA CON M EN PC) =====
+-- ===== VIP SYSTEM =====
 local VIP_USER_IDS = {
-	10214014023  -- Reemplaza con tu UserID real
+	10214014023
 }
 
 -- ===== SERVICIOS =====
@@ -36,68 +33,52 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
-
 local player = Players.LocalPlayer
 
--- ===== VERIFICAR SI ES VIP =====
-local isVIP = false
-for _, id in ipairs(VIP_USER_IDS) do
-	if player.UserId == id then
-		isVIP = true
-		break
-	end
-end
+-- ===== VERIFICAR VIP =====
+local isVIP = table.find(VIP_USER_IDS, player.UserId) ~= nil
 
 -- ===== CONFIG =====
-local ALERT_DISTANCE = 20
+local config = {
+	ALERT_DISTANCE = 20,
+	AIM_FOV = 30,
+	SMOOTHNESS = 0.15,
+	MIN_SPEED = 16,
+	MAX_SPEED = 200,
+	SPEED_INCREMENT = 5,
+	FREEZE_DURATION = 5,
+	FREEZE_COOLDOWN = 15
+}
+
 local enabled = getgenv().ESP_ZOMBIES_CONFIG.espEnabled
 local aimbotEnabled = getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled
 local speedHackEnabled = getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled
 local speedValue = getgenv().ESP_ZOMBIES_CONFIG.speedValue
-local firstTimeKeyboard = getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard
 local killCount = getgenv().ESP_ZOMBIES_CONFIG.killCount
 local showKills = getgenv().ESP_ZOMBIES_CONFIG.showKills
+local firstTimeKeyboard = getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard
+
+-- Zombie Freeze variables
+local freezeActive = false
+local freezeCooldown = false
+local freezeCooldownTime = 0
+
 local Camera = workspace.CurrentCamera
-local AIM_FOV = 30
-local SMOOTHNESS = 0.15
 
--- Configuración Speed Hack
-local MIN_SPEED = 16
-local MAX_SPEED = 200
-local SPEED_INCREMENT = 5
-
--- caches
+-- ===== CACHES (OPTIMIZACIÓN) =====
 local espObjects = {}
 local cachedZombies = {}
 local cachedBoxes = {}
+local connections = {}
 
--- connections
-local zombieAddedConnection
-local renderConnection
-local inputConnection
-local speedConnection
-local killCounterConnection
-
--- ===== FUNCIÓN DE AUTO-RECARGA =====
+-- ===== AUTO-RECARGA =====
 local function setupAutoReload()
-	local queue =
-		queue_on_teleport
-		or (syn and syn.queue_on_teleport)
-		or (fluxus and fluxus.queue_on_teleport)
-
-	if not queue then
-		warn("⚠️ queue_on_teleport no disponible - persistencia desactivada")
-		return
-	end
+	local queue = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+	if not queue then return end
 
 	player.OnTeleport:Connect(function(state)
-		if state ~= Enum.TeleportState.Started then
-			return
-		end
-
-		print("🔄 Guardando estado para el próximo servidor...")
-
-		-- Guardar configuración
+		if state ~= Enum.TeleportState.Started then return end
+		
 		getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
 		getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
 		getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
@@ -106,205 +87,327 @@ local function setupAutoReload()
 		getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
 		getgenv().ESP_ZOMBIES_CONFIG.showKills = showKills
 
-		-- Código que se ejecutará EN EL NUEVO SERVER
-		local code = [[
+		queue([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(1)
-
-			-- limpiar flags viejas del server anterior
 			_G.ESP_ZOMBIES_LOADED = nil
-
 			if getgenv().ESP_ZOMBIES_SOURCE then
-				print("🔄 Recargando ESP persistente...")
 				loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
-				print("✅ ESP recargado correctamente")
-			else
-				warn("❌ ESP_ZOMBIES_SOURCE no encontrado")
 			end
-		]]
-
-		queue(code)
+		]])
 	end)
 end
 
 -- ===== GUI =====
 local PlayerGui = player:WaitForChild("PlayerGui")
-local ScreenGui = PlayerGui:FindFirstChild("ESP_GUI")
+local ScreenGui = PlayerGui:FindFirstChild("ESP_GUI") or Instance.new("ScreenGui")
+ScreenGui.Name = "ESP_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
 
--- Si ya existe la GUI, la reutilizamos
-if not ScreenGui then
-	ScreenGui = Instance.new("ScreenGui")
-	ScreenGui.Name = "ESP_GUI"
-	ScreenGui.ResetOnSpawn = false
-	ScreenGui.Parent = PlayerGui
-	print("🎨 GUI creada por primera vez")
-else
-	print("🎨 GUI encontrada - reutilizando")
+-- ===== KILL COUNTER MEJORADO =====
+local KillCounterFrame = ScreenGui:FindFirstChild("KillCounterFrame")
+if not KillCounterFrame then
+	KillCounterFrame = Instance.new("Frame")
+	KillCounterFrame.Name = "KillCounterFrame"
+	KillCounterFrame.Size = UDim2.new(0, 200, 0, 60)
+	KillCounterFrame.Position = UDim2.new(0.5, -100, 0.015, 0)
+	KillCounterFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	KillCounterFrame.BackgroundTransparency = 0.2
+	KillCounterFrame.BorderSizePixel = 0
+	KillCounterFrame.Visible = false
+	KillCounterFrame.Parent = ScreenGui
+
+	local FrameCorner = Instance.new("UICorner")
+	FrameCorner.CornerRadius = UDim.new(0, 12)
+	FrameCorner.Parent = KillCounterFrame
+
+	local FrameStroke = Instance.new("UIStroke")
+	FrameStroke.Color = Color3.fromRGB(255, 215, 0)
+	FrameStroke.Thickness = 2
+	FrameStroke.Transparency = 0.3
+	FrameStroke.Parent = KillCounterFrame
+
+	-- Gradiente
+	local Gradient = Instance.new("UIGradient")
+	Gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))
+	}
+	Gradient.Rotation = 90
+	Gradient.Parent = KillCounterFrame
+
+	-- Kill Icon
+	local KillIcon = Instance.new("TextLabel")
+	KillIcon.Name = "KillIcon"
+	KillIcon.Size = UDim2.new(0, 35, 0, 35)
+	KillIcon.Position = UDim2.new(0, 10, 0.5, -17.5)
+	KillIcon.BackgroundTransparency = 1
+	KillIcon.Text = "💀"
+	KillIcon.TextColor3 = Color3.fromRGB(255, 80, 80)
+	KillIcon.Font = Enum.Font.GothamBold
+	KillIcon.TextSize = 28
+	KillIcon.Parent = KillCounterFrame
+
+	-- Kill Count
+	local KillCount = Instance.new("TextLabel")
+	KillCount.Name = "KillCount"
+	KillCount.Size = UDim2.new(0, 145, 0, 30)
+	KillCount.Position = UDim2.new(0, 50, 0, 5)
+	KillCount.BackgroundTransparency = 1
+	KillCount.Text = "0"
+	KillCount.TextColor3 = Color3.fromRGB(255, 255, 255)
+	KillCount.Font = Enum.Font.GothamBold
+	KillCount.TextSize = 32
+	KillCount.TextXAlignment = Enum.TextXAlignment.Left
+	KillCount.TextStrokeTransparency = 0.5
+	KillCount.Parent = KillCounterFrame
+
+	-- Kill Label
+	local KillLabel = Instance.new("TextLabel")
+	KillLabel.Name = "KillLabel"
+	KillLabel.Size = UDim2.new(0, 145, 0, 20)
+	KillLabel.Position = UDim2.new(0, 50, 0, 35)
+	KillLabel.BackgroundTransparency = 1
+	KillLabel.Text = "KILLS"
+	KillLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	KillLabel.Font = Enum.Font.GothamBold
+	KillLabel.TextSize = 14
+	KillLabel.TextXAlignment = Enum.TextXAlignment.Left
+	KillLabel.TextTransparency = 0.3
+	KillLabel.Parent = KillCounterFrame
 end
 
--- ===== KILL COUNTER (SOLO PC) =====
-local KillCounterLabel = ScreenGui:FindFirstChild("KillCounterLabel")
-if not KillCounterLabel then
-	KillCounterLabel = Instance.new("TextLabel")
-	KillCounterLabel.Name = "KillCounterLabel"
-	KillCounterLabel.Size = UDim2.new(0, 150, 0, 35)
-	KillCounterLabel.Position = UDim2.new(0.5, -75, 0.02, 0)
-	KillCounterLabel.BackgroundTransparency = 1
-	KillCounterLabel.BorderSizePixel = 0
-	KillCounterLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-	KillCounterLabel.Font = Enum.Font.GothamBold
-	KillCounterLabel.TextSize = 22
-	KillCounterLabel.TextStrokeTransparency = 0.5
-	KillCounterLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	KillCounterLabel.Visible = false
-	KillCounterLabel.Parent = ScreenGui
-end
-
--- Actualizar texto del contador
+-- Actualizar contador con animación optimizada
+local lastKillTime = 0
 local function updateKillCounter()
-	if KillCounterLabel then
-		KillCounterLabel.Text = "💀 KILLS: " .. killCount
+	if not KillCounterFrame then return end
+	
+	local killCountLabel = KillCounterFrame:FindFirstChild("KillCount")
+	local killIcon = KillCounterFrame:FindFirstChild("KillIcon")
+	local frameStroke = KillCounterFrame:FindFirstChild("UIStroke")
+	
+	if killCountLabel then
+		killCountLabel.Text = tostring(killCount)
+		
+		-- Animación optimizada (solo si pasó suficiente tiempo)
+		local currentTime = tick()
+		if currentTime - lastKillTime > 0.1 then
+			lastKillTime = currentTime
+			task.spawn(function()
+				-- Pulso en número
+				killCountLabel.TextSize = 36
+				if killIcon then killIcon.TextSize = 32 end
+				if frameStroke then frameStroke.Transparency = 0 end
+				
+				task.wait(0.08)
+				
+				killCountLabel.TextSize = 32
+				if killIcon then killIcon.TextSize = 28 end
+				if frameStroke then frameStroke.Transparency = 0.3 end
+			end)
+		end
 	end
 end
 
--- ===== VIP TELEPORT SYSTEM (SIN GUI - SOLO TECLADO) =====
-local currentTPOption = 1 -- 1 = Sin TP, 2 = Pack-a-Punch, 3 = Mystery Box
-local TPOptions = {
-	"SIN TP",
-	"PACK-A-PUNCH",
-	"MYSTERY BOX"
-}
+-- ===== INFO HUD (VIP) =====
+local InfoHUD
+if isVIP then
+	InfoHUD = Instance.new("Frame")
+	InfoHUD.Name = "InfoHUD"
+	InfoHUD.Size = UDim2.new(0, 220, 0, 150)
+	InfoHUD.Position = UDim2.new(0.015, 0, 0.12, 0)
+	InfoHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	InfoHUD.BackgroundTransparency = 0.2
+	InfoHUD.BorderSizePixel = 0
+	InfoHUD.Visible = false
+	InfoHUD.Parent = ScreenGui
 
--- Label para mostrar opción actual
-local TPSelectorLabel = ScreenGui:FindFirstChild("TPSelectorLabel")
-if isVIP and not TPSelectorLabel then
+	local HUDCorner = Instance.new("UICorner")
+	HUDCorner.CornerRadius = UDim.new(0, 12)
+	HUDCorner.Parent = InfoHUD
+
+	local HUDStroke = Instance.new("UIStroke")
+	HUDStroke.Color = Color3.fromRGB(100, 150, 255)
+	HUDStroke.Thickness = 2
+	HUDStroke.Transparency = 0.3
+	HUDStroke.Parent = InfoHUD
+
+	-- Título
+	local HUDTitle = Instance.new("TextLabel")
+	HUDTitle.Size = UDim2.new(1, -20, 0, 25)
+	HUDTitle.Position = UDim2.new(0, 10, 0, 5)
+	HUDTitle.BackgroundTransparency = 1
+	HUDTitle.Text = "📊 INFO HUD"
+	HUDTitle.TextColor3 = Color3.fromRGB(100, 150, 255)
+	HUDTitle.Font = Enum.Font.GothamBold
+	HUDTitle.TextSize = 16
+	HUDTitle.TextXAlignment = Enum.TextXAlignment.Left
+	HUDTitle.Parent = InfoHUD
+
+	-- Ronda
+	local RoundLabel = Instance.new("TextLabel")
+	RoundLabel.Name = "RoundLabel"
+	RoundLabel.Size = UDim2.new(1, -20, 0, 20)
+	RoundLabel.Position = UDim2.new(0, 10, 0, 35)
+	RoundLabel.BackgroundTransparency = 1
+	RoundLabel.Text = "🎯 RONDA: --"
+	RoundLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	RoundLabel.Font = Enum.Font.GothamBold
+	RoundLabel.TextSize = 14
+	RoundLabel.TextXAlignment = Enum.TextXAlignment.Left
+	RoundLabel.Parent = InfoHUD
+
+	-- Zombies vivos
+	local ZombiesLabel = Instance.new("TextLabel")
+	ZombiesLabel.Name = "ZombiesLabel"
+	ZombiesLabel.Size = UDim2.new(1, -20, 0, 20)
+	ZombiesLabel.Position = UDim2.new(0, 10, 0, 60)
+	ZombiesLabel.BackgroundTransparency = 1
+	ZombiesLabel.Text = "💀 ZOMBIES: 0"
+	ZombiesLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	ZombiesLabel.Font = Enum.Font.GothamBold
+	ZombiesLabel.TextSize = 14
+	ZombiesLabel.TextXAlignment = Enum.TextXAlignment.Left
+	ZombiesLabel.Parent = InfoHUD
+
+	-- Velocidad actual
+	local SpeedLabel = Instance.new("TextLabel")
+	SpeedLabel.Name = "SpeedLabel"
+	SpeedLabel.Size = UDim2.new(1, -20, 0, 20)
+	SpeedLabel.Position = UDim2.new(0, 10, 0, 85)
+	SpeedLabel.BackgroundTransparency = 1
+	SpeedLabel.Text = "⚡ VELOCIDAD: 16"
+	SpeedLabel.TextColor3 = Color3.fromRGB(100, 255, 200)
+	SpeedLabel.Font = Enum.Font.GothamBold
+	SpeedLabel.TextSize = 14
+	SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+	SpeedLabel.Parent = InfoHUD
+
+	-- Freeze Cooldown
+	local FreezeLabel = Instance.new("TextLabel")
+	FreezeLabel.Name = "FreezeLabel"
+	FreezeLabel.Size = UDim2.new(1, -20, 0, 20)
+	FreezeLabel.Position = UDim2.new(0, 10, 0, 110)
+	FreezeLabel.BackgroundTransparency = 1
+	FreezeLabel.Text = "❄️ FREEZE: LISTO"
+	FreezeLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+	FreezeLabel.Font = Enum.Font.GothamBold
+	FreezeLabel.TextSize = 14
+	FreezeLabel.TextXAlignment = Enum.TextXAlignment.Left
+	FreezeLabel.Parent = InfoHUD
+end
+
+-- Función para actualizar Info HUD
+local function updateInfoHUD()
+	if not InfoHUD then return end
+	
+	local roundLabel = InfoHUD:FindFirstChild("RoundLabel")
+	local zombiesLabel = InfoHUD:FindFirstChild("ZombiesLabel")
+	local speedLabelHUD = InfoHUD:FindFirstChild("SpeedLabel")
+	local freezeLabel = InfoHUD:FindFirstChild("FreezeLabel")
+	
+	-- Actualizar ronda (buscar en workspace)
+	if roundLabel then
+		local roundValue = workspace:FindFirstChild("RoundValue") or workspace:FindFirstChild("Round")
+		if roundValue and roundValue:IsA("IntValue") then
+			roundLabel.Text = "🎯 RONDA: " .. roundValue.Value
+		else
+			roundLabel.Text = "🎯 RONDA: --"
+		end
+	end
+	
+	-- Actualizar zombies vivos
+	if zombiesLabel then
+		local baddies = workspace:FindFirstChild("Baddies")
+		local count = baddies and #baddies:GetChildren() or 0
+		zombiesLabel.Text = "💀 ZOMBIES: " .. count
+	end
+	
+	-- Actualizar velocidad
+	if speedLabelHUD then
+		local char = player.Character
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		local currentSpeed = humanoid and math.floor(humanoid.WalkSpeed) or 16
+		speedLabelHUD.Text = "⚡ VELOCIDAD: " .. currentSpeed
+	end
+	
+	-- Actualizar freeze cooldown
+	if freezeLabel then
+		if freezeActive then
+			freezeLabel.Text = "❄️ FREEZE: ACTIVO"
+			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 255)
+		elseif freezeCooldown then
+			local timeLeft = math.ceil(freezeCooldownTime - tick())
+			freezeLabel.Text = "❄️ FREEZE: " .. timeLeft .. "s"
+			freezeLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
+		else
+			freezeLabel.Text = "❄️ FREEZE: LISTO"
+			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
+		end
+	end
+end
+local currentTPOption = 1
+local TPOptions = {"SIN TP", "PACK-A-PUNCH", "MYSTERY BOX"}
+
+local TPSelectorLabel
+if isVIP then
 	TPSelectorLabel = Instance.new("TextLabel")
 	TPSelectorLabel.Name = "TPSelectorLabel"
-	TPSelectorLabel.Size = UDim2.new(0, 200, 0, 30)
-	TPSelectorLabel.Position = UDim2.new(0.02, 0, 0.3, 0)
+	TPSelectorLabel.Size = UDim2.new(0, 220, 0, 35)
+	TPSelectorLabel.Position = UDim2.new(0.015, 0, 0.25, 0)
 	TPSelectorLabel.BackgroundTransparency = 1
 	TPSelectorLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 	TPSelectorLabel.Font = Enum.Font.GothamBold
-	TPSelectorLabel.TextSize = 18
-	TPSelectorLabel.TextStrokeTransparency = 0.5
+	TPSelectorLabel.TextSize = 20
+	TPSelectorLabel.TextStrokeTransparency = 0.3
 	TPSelectorLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 	TPSelectorLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TPSelectorLabel.Visible = false
 	TPSelectorLabel.Parent = ScreenGui
 end
 
--- Función para actualizar el texto del selector
 local function updateTPSelector()
 	if TPSelectorLabel then
-		TPSelectorLabel.Text = "TP: " .. TPOptions[currentTPOption]
+		TPSelectorLabel.Text = "📍 " .. TPOptions[currentTPOption]
 	end
 end
 
--- Función para cambiar opción de TP
-local function cycleTPOption()
-	currentTPOption = currentTPOption + 1
-	if currentTPOption > #TPOptions then
-		currentTPOption = 1
-	end
-	updateTPSelector()
-	showStatus("TP: " .. TPOptions[currentTPOption], Color3.fromRGB(255, 215, 0))
-end
+-- ===== OTROS ELEMENTOS GUI =====
+local AlertText = Instance.new("TextLabel")
+AlertText.Name = "AlertText"
+AlertText.Size = UDim2.new(0, 360, 0, 50)
+AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
+AlertText.BackgroundTransparency = 1
+AlertText.TextColor3 = Color3.fromRGB(255, 0, 0)
+AlertText.Font = Enum.Font.GothamBold
+AlertText.TextSize = 30
+AlertText.TextStrokeTransparency = 0.3
+AlertText.Visible = false
+AlertText.Parent = ScreenGui
 
--- Función para ejecutar TP según opción seleccionada
-local function executeTP()
-	if currentTPOption == 1 then
-		showStatus("❌ Sin TP seleccionado", Color3.fromRGB(255, 100, 0))
-		return
-	end
+local CircleButton = Instance.new("TextButton")
+CircleButton.Name = "CircleButton"
+CircleButton.Size = UDim2.new(0, 80, 0, 80)
+CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
+CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CircleButton.BackgroundTransparency = 0.3
+CircleButton.Text = "⚙️"
+CircleButton.TextSize = 35
+CircleButton.Font = Enum.Font.GothamBold
+CircleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CircleButton.Parent = ScreenGui
 
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then
-		showStatus("❌ No se encontró tu personaje", Color3.fromRGB(255, 0, 0))
-		return
-	end
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = CircleButton
 
-	local interact = workspace:FindFirstChild("Interact")
-	if not interact then
-		showStatus("❌ No se encontró la carpeta Interact", Color3.fromRGB(255, 0, 0))
-		return
-	end
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(255, 255, 255)
+UIStroke.Thickness = 3
+UIStroke.Parent = CircleButton
 
-	if currentTPOption == 2 then
-		-- TP a Pack-a-Punch
-		local packAPunch = interact:FindFirstChild("Pack-A-Punch")
-		if not packAPunch then
-			showStatus("❌ No se encontró Pack-a-Punch", Color3.fromRGB(255, 0, 0))
-			return
-		end
-
-		local targetPart = packAPunch:FindFirstChild("Part") or packAPunch:FindFirstChildWhichIsA("BasePart")
-		if targetPart then
-			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
-			showStatus("✅ TP a Pack-a-Punch", Color3.fromRGB(0, 255, 0))
-		else
-			showStatus("❌ No se encontró la parte del Pack-a-Punch", Color3.fromRGB(255, 0, 0))
-		end
-
-	elseif currentTPOption == 3 then
-		-- TP a Mystery Box
-		local mysteryBox = interact:FindFirstChild("MysteryBox")
-		if not mysteryBox then
-			showStatus("❌ No se encontró Mystery Box", Color3.fromRGB(255, 0, 0))
-			return
-		end
-
-		local targetPart = mysteryBox:FindFirstChild("Part") or mysteryBox:FindFirstChildWhichIsA("BasePart")
-		if targetPart then
-			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
-			showStatus("✅ TP a Mystery Box", Color3.fromRGB(0, 255, 0))
-		else
-			showStatus("❌ No se encontró la parte del Mystery Box", Color3.fromRGB(255, 0, 0))
-		end
-	end
-end
-
--- ALERTA
-local AlertText = ScreenGui:FindFirstChild("AlertText")
-if not AlertText then
-	AlertText = Instance.new("TextLabel")
-	AlertText.Name = "AlertText"
-	AlertText.Size = UDim2.new(0, 360, 0, 50)
-	AlertText.Position = UDim2.new(0.5, -180, 0.12, 0)
-	AlertText.BackgroundTransparency = 1
-	AlertText.TextColor3 = Color3.fromRGB(255, 0, 0)
-	AlertText.Font = Enum.Font.GothamBold
-	AlertText.TextSize = 30
-	AlertText.Visible = false
-	AlertText.Parent = ScreenGui
-end
-
--- BOTÓN CIRCULAR
-local CircleButton = ScreenGui:FindFirstChild("CircleButton")
-if not CircleButton then
-	CircleButton = Instance.new("TextButton")
-	CircleButton.Name = "CircleButton"
-	CircleButton.Size = UDim2.new(0, 80, 0, 80)
-	CircleButton.Position = UDim2.new(0.5, -40, 0.10, 0)
-	CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	CircleButton.BackgroundTransparency = 0.3
-	CircleButton.Text = "⚙️"
-	CircleButton.TextSize = 35
-	CircleButton.Font = Enum.Font.GothamBold
-	CircleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	CircleButton.Parent = ScreenGui
-
-	local UICorner = Instance.new("UICorner")
-	UICorner.CornerRadius = UDim.new(1, 0)
-	UICorner.Parent = CircleButton
-
-	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Color = Color3.fromRGB(255, 255, 255)
-	UIStroke.Thickness = 3
-	UIStroke.Parent = CircleButton
-end
-
--- Hacer el botón arrastrable
+-- Botón arrastrable (optimizado)
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -328,7 +431,7 @@ CircleButton.InputChanged:Connect(function(input)
 	end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
+connections.drag = UserInputService.InputChanged:Connect(function(input)
 	if input == dragInput and dragging then
 		local delta = input.Position - dragStart
 		CircleButton.Position = UDim2.new(
@@ -340,200 +443,580 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- MENU MÓVIL
-local MobileMenu = ScreenGui:FindFirstChild("MobileMenu")
-if not MobileMenu then
-	MobileMenu = Instance.new("Frame")
-	MobileMenu.Name = "MobileMenu"
-	MobileMenu.Size = UDim2.new(0, 280, 0, 380)
-	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -190)
-	MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	MobileMenu.BackgroundTransparency = 0.1
-	MobileMenu.BorderSizePixel = 0
-	MobileMenu.Visible = false
-	MobileMenu.Parent = ScreenGui
+-- MENU MÓVIL (código reducido)
+local MobileMenu = Instance.new("Frame")
+MobileMenu.Name = "MobileMenu"
+MobileMenu.Size = UDim2.new(0, 280, 0, 380)
+MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -190)
+MobileMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MobileMenu.BackgroundTransparency = 0.1
+MobileMenu.BorderSizePixel = 0
+MobileMenu.Visible = false
+MobileMenu.Parent = ScreenGui
 
-	local MenuCorner = Instance.new("UICorner")
-	MenuCorner.CornerRadius = UDim.new(0, 15)
-	MenuCorner.Parent = MobileMenu
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 15)
+MenuCorner.Parent = MobileMenu
 
-	local MenuStroke = Instance.new("UIStroke")
-	MenuStroke.Color = Color3.fromRGB(255, 255, 255)
-	MenuStroke.Thickness = 2
-	MenuStroke.Parent = MobileMenu
-else
-	-- Actualizar tamaño del menú existente
-	MobileMenu.Size = UDim2.new(0, 280, 0, 380)
-	MobileMenu.Position = UDim2.new(0.5, -140, 0.5, -190)
+local MenuStroke = Instance.new("UIStroke")
+MenuStroke.Color = Color3.fromRGB(255, 255, 255)
+MenuStroke.Thickness = 2
+MenuStroke.Parent = MobileMenu
+
+-- Función helper para crear botones
+local function createButton(name, text, position, color)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Size = UDim2.new(0, 240, 0, 50)
+	button.Position = position
+	button.BackgroundColor3 = color
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 20
+	button.Parent = MobileMenu
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+	
+	return button
 end
 
--- TÍTULO DEL MENÚ
-local MenuTitle = MobileMenu:FindFirstChild("MenuTitle")
-if not MenuTitle then
-	MenuTitle = Instance.new("TextLabel")
-	MenuTitle.Name = "MenuTitle"
-	MenuTitle.Size = UDim2.new(1, 0, 0, 40)
-	MenuTitle.Position = UDim2.new(0, 0, 0, 0)
-	MenuTitle.BackgroundTransparency = 1
-	MenuTitle.Text = "MENU DE CONTROL"
-	MenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-	MenuTitle.Font = Enum.Font.GothamBold
-	MenuTitle.TextSize = 18
-	MenuTitle.Parent = MobileMenu
+-- Crear botones del menú
+local MenuTitle = Instance.new("TextLabel")
+MenuTitle.Size = UDim2.new(1, 0, 0, 40)
+MenuTitle.BackgroundTransparency = 1
+MenuTitle.Text = "MENU DE CONTROL"
+MenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MenuTitle.Font = Enum.Font.GothamBold
+MenuTitle.TextSize = 18
+MenuTitle.Parent = MobileMenu
+
+local ESPButton = createButton("ESPButton", enabled and "ESP: ON" or "ESP: OFF", 
+	UDim2.new(0.5, -120, 0, 55), 
+	enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local AimbotButton = createButton("AimbotButton", aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF",
+	UDim2.new(0.5, -120, 0, 115),
+	aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local SpeedButton = createButton("SpeedButton", speedHackEnabled and "SPEED: ON" or "SPEED: OFF",
+	UDim2.new(0.5, -120, 0, 175),
+	speedHackEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local ServerHopButton = createButton("ServerHopButton", "🔄 CAMBIAR SERVER",
+	UDim2.new(0.5, -120, 0, 295),
+	Color3.fromRGB(100, 100, 255))
+
+-- Speed slider (simplificado)
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0, 240, 0, 25)
+SpeedLabel.Position = UDim2.new(0.5, -120, 0, 235)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "Velocidad: " .. speedValue
+SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedLabel.Font = Enum.Font.GothamBold
+SpeedLabel.TextSize = 16
+SpeedLabel.Parent = MobileMenu
+
+local SliderBG = Instance.new("Frame")
+SliderBG.Size = UDim2.new(0, 240, 0, 10)
+SliderBG.Position = UDim2.new(0.5, -120, 0, 268)
+SliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SliderBG.BorderSizePixel = 0
+SliderBG.Parent = MobileMenu
+
+local SliderCorner = Instance.new("UICorner")
+SliderCorner.CornerRadius = UDim.new(0, 5)
+SliderCorner.Parent = SliderBG
+
+local SliderFill = Instance.new("Frame")
+SliderFill.Size = UDim2.new((speedValue - config.MIN_SPEED) / (config.MAX_SPEED - config.MIN_SPEED), 0, 1, 0)
+SliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+SliderFill.BorderSizePixel = 0
+SliderFill.Parent = SliderBG
+
+local FillCorner = Instance.new("UICorner")
+FillCorner.CornerRadius = UDim.new(0, 5)
+FillCorner.Parent = SliderFill
+
+local SliderButton = Instance.new("TextButton")
+SliderButton.Size = UDim2.new(0, 20, 0, 20)
+SliderButton.Position = UDim2.new((speedValue - config.MIN_SPEED) / (config.MAX_SPEED - config.MIN_SPEED), -10, 0.5, -10)
+SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SliderButton.BorderSizePixel = 0
+SliderButton.Text = ""
+SliderButton.Parent = SliderBG
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(1, 0)
+ButtonCorner.Parent = SliderButton
+
+-- Texto de bienvenida
+local WelcomeText = Instance.new("TextLabel")
+WelcomeText.Size = UDim2.new(0, 400, 0, 35)
+WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
+WelcomeText.BackgroundTransparency = 0.3
+WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+WelcomeText.Text = isVIP and "Creator = Nobodxy85-bit  :D | 👑 VIP" or "Creator = Nobodxy85-bit  :D"
+WelcomeText.TextColor3 = isVIP and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(255, 255, 255)
+WelcomeText.Font = Enum.Font.GothamBold
+WelcomeText.TextSize = 18
+WelcomeText.Parent = ScreenGui
+
+local WelcomeCorner = Instance.new("UICorner")
+WelcomeCorner.CornerRadius = UDim.new(0, 10)
+WelcomeCorner.Parent = WelcomeText
+
+task.spawn(function()
+	task.wait(3)
+	for i = 0, 30 do
+		WelcomeText.TextTransparency = i / 30
+		WelcomeText.BackgroundTransparency = 0.3 + (0.7 * (i / 30))
+		task.wait(0.067)
+	end
+	WelcomeText.Visible = false
+end)
+
+-- Status text
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 300, 0, 35)
+StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
+StatusText.BackgroundTransparency = 0.5
+StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusText.Font = Enum.Font.GothamBold
+StatusText.TextSize = 18
+StatusText.Visible = false
+StatusText.Parent = ScreenGui
+
+-- ===== FUNCIONES OPTIMIZADAS =====
+local function showStatus(text, color)
+	if not StatusText then return end
+	StatusText.Text = text
+	StatusText.TextColor3 = color
+	StatusText.Visible = true
+	StatusText.TextTransparency = 0
+	StatusText.BackgroundTransparency = 0.5
+	
+	task.delay(2, function()
+		for i = 0, 30 do
+			if StatusText then
+				StatusText.TextTransparency = i / 30
+				task.wait(0.033)
+			end
+		end
+		if StatusText then StatusText.Visible = false end
+	end)
 end
 
--- BOTÓN ESP
-local ESPButton = MobileMenu:FindFirstChild("ESPButton")
-if not ESPButton then
-	ESPButton = Instance.new("TextButton")
-	ESPButton.Name = "ESPButton"
-	ESPButton.Size = UDim2.new(0, 240, 0, 50)
-	ESPButton.Position = UDim2.new(0.5, -120, 0, 55)
-	ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	ESPButton.Font = Enum.Font.GothamBold
-	ESPButton.TextSize = 20
-	ESPButton.Parent = MobileMenu
-
-	local ESPCorner = Instance.new("UICorner")
-	ESPCorner.CornerRadius = UDim.new(0, 10)
-	ESPCorner.Parent = ESPButton
+local function cycleTPOption()
+	currentTPOption = currentTPOption % #TPOptions + 1
+	updateTPSelector()
+	showStatus("TP: " .. TPOptions[currentTPOption], Color3.fromRGB(255, 215, 0))
 end
 
--- Actualizar estado visual del botón ESP
-ESPButton.BackgroundColor3 = enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-ESPButton.Text = enabled and "ESP: ON" or "ESP: OFF"
+local function executeTP()
+	if currentTPOption == 1 then
+		showStatus("❌ Sin TP seleccionado", Color3.fromRGB(255, 100, 0))
+		return
+	end
 
--- BOTÓN AIMBOT
-local AimbotButton = MobileMenu:FindFirstChild("AimbotButton")
-if not AimbotButton then
-	AimbotButton = Instance.new("TextButton")
-	AimbotButton.Name = "AimbotButton"
-	AimbotButton.Size = UDim2.new(0, 240, 0, 50)
-	AimbotButton.Position = UDim2.new(0.5, -120, 0, 115)
-	AimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	AimbotButton.Font = Enum.Font.GothamBold
-	AimbotButton.TextSize = 20
-	AimbotButton.Parent = MobileMenu
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		showStatus("❌ No se encontró tu personaje", Color3.fromRGB(255, 0, 0))
+		return
+	end
 
-	local AimbotCorner = Instance.new("UICorner")
-	AimbotCorner.CornerRadius = UDim.new(0, 10)
-	AimbotCorner.Parent = AimbotButton
+	local interact = workspace:FindFirstChild("Interact")
+	if not interact then
+		showStatus("❌ No se encontró Interact", Color3.fromRGB(255, 0, 0))
+		return
+	end
+
+	local targetName = currentTPOption == 2 and "Pack-A-Punch" or "MysteryBox"
+	local target = interact:FindFirstChild(targetName)
+	
+	if not target then
+		showStatus("❌ No se encontró " .. targetName, Color3.fromRGB(255, 0, 0))
+		return
+	end
+
+	local targetPart = target:FindFirstChildWhichIsA("BasePart")
+	if targetPart then
+		hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
+		showStatus("✅ TP a " .. targetName, Color3.fromRGB(0, 255, 0))
+	end
 end
 
--- Actualizar estado visual del botón Aimbot
-AimbotButton.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-AimbotButton.Text = aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF"
-
--- ===== SPEED HACK CONTROLS =====
-
--- BOTÓN SPEED HACK
-local SpeedButton = MobileMenu:FindFirstChild("SpeedButton")
-if not SpeedButton then
-	SpeedButton = Instance.new("TextButton")
-	SpeedButton.Name = "SpeedButton"
-	SpeedButton.Size = UDim2.new(0, 240, 0, 50)
-	SpeedButton.Position = UDim2.new(0.5, -120, 0, 175)
-	SpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	SpeedButton.Font = Enum.Font.GothamBold
-	SpeedButton.TextSize = 20
-	SpeedButton.Parent = MobileMenu
-
-	local SpeedCorner = Instance.new("UICorner")
-	SpeedCorner.CornerRadius = UDim.new(0, 10)
-	SpeedCorner.Parent = SpeedButton
-end
-
--- Actualizar estado visual del botón Speed
-SpeedButton.BackgroundColor3 = speedHackEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-SpeedButton.Text = speedHackEnabled and "SPEED: ON" or "SPEED: OFF"
-
--- LABEL SPEED VALUE
-local SpeedLabel = MobileMenu:FindFirstChild("SpeedLabel")
-if not SpeedLabel then
-	SpeedLabel = Instance.new("TextLabel")
-	SpeedLabel.Name = "SpeedLabel"
-	SpeedLabel.Size = UDim2.new(0, 240, 0, 25)
-	SpeedLabel.Position = UDim2.new(0.5, -120, 0, 235)
-	SpeedLabel.BackgroundTransparency = 1
-	SpeedLabel.Text = "Velocidad: " .. speedValue
-	SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-	SpeedLabel.Font = Enum.Font.GothamBold
-	SpeedLabel.TextSize = 16
-	SpeedLabel.Parent = MobileMenu
-end
-
--- SPEED SLIDER BACKGROUND
-local SliderBG = MobileMenu:FindFirstChild("SliderBG")
-if not SliderBG then
-	SliderBG = Instance.new("Frame")
-	SliderBG.Name = "SliderBG"
-	SliderBG.Size = UDim2.new(0, 240, 0, 10)
-	SliderBG.Position = UDim2.new(0.5, -120, 0, 268)
-	SliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	SliderBG.BorderSizePixel = 0
-	SliderBG.Parent = MobileMenu
-
-	local SliderCorner = Instance.new("UICorner")
-	SliderCorner.CornerRadius = UDim.new(0, 5)
-	SliderCorner.Parent = SliderBG
-end
-
--- SPEED SLIDER FILL
-local SliderFill = SliderBG:FindFirstChild("SliderFill")
-if not SliderFill then
-	SliderFill = Instance.new("Frame")
-	SliderFill.Name = "SliderFill"
-	SliderFill.Size = UDim2.new((speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), 0, 1, 0)
-	SliderFill.Position = UDim2.new(0, 0, 0, 0)
-	SliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-	SliderFill.BorderSizePixel = 0
-	SliderFill.Parent = SliderBG
-
-	local FillCorner = Instance.new("UICorner")
-	FillCorner.CornerRadius = UDim.new(0, 5)
-	FillCorner.Parent = SliderFill
-end
-
--- SPEED SLIDER BUTTON
-local SliderButton = SliderBG:FindFirstChild("SliderButton")
-if not SliderButton then
-	SliderButton = Instance.new("TextButton")
-	SliderButton.Name = "SliderButton"
-	SliderButton.Size = UDim2.new(0, 20, 0, 20)
-	SliderButton.Position = UDim2.new((speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), -10, 0.5, -10)
-	SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	SliderButton.BorderSizePixel = 0
-	SliderButton.Text = ""
-	SliderButton.Parent = SliderBG
-
-	local ButtonCorner = Instance.new("UICorner")
-	ButtonCorner.CornerRadius = UDim.new(1, 0)
-	ButtonCorner.Parent = SliderButton
-end
-
--- Función para actualizar el slider
-local function updateSlider(value)
-	speedValue = math.clamp(value, MIN_SPEED, MAX_SPEED)
+local function serverHop()
+	showStatus("🔄 Buscando servidor...", Color3.fromRGB(100, 150, 255))
+	
+	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
+	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
 	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
+	getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+	getgenv().ESP_ZOMBIES_CONFIG.showKills = showKills
 	
-	local percent = (speedValue - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
-	SliderFill.Size = UDim2.new(percent, 0, 1, 0)
-	SliderButton.Position = UDim2.new(percent, -10, 0.5, -10)
-	SpeedLabel.Text = "Velocidad: " .. math.floor(speedValue)
+	pcall(function()
+		local servers = {}
+		local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+		local body = game:GetService("HttpService"):JSONDecode(req)
+		
+		if body and body.data then
+			for _, v in ipairs(body.data) do
+				if v.id ~= game.JobId and v.playing < v.maxPlayers then
+					table.insert(servers, v.id)
+				end
+			end
+		end
+		
+		if #servers > 0 then
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(#servers)], player)
+		else
+			showStatus("❌ No hay servidores", Color3.fromRGB(255, 0, 0))
+		end
+	end)
+end
+
+-- ===== ESP OPTIMIZADO CON DISTANCIA =====
+local function getDistanceColor(distance)
+	if distance > 30 then
+		return Color3.fromRGB(0, 255, 0) -- Verde = Lejos
+	elseif distance > 15 then
+		return Color3.fromRGB(255, 255, 0) -- Amarillo = Medio
+	else
+		return Color3.fromRGB(255, 0, 0) -- Rojo = Cerca
+	end
+end
+
+local function addOutline(part, color)
+	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Highlight") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.Adornee = part
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0
+	highlight.OutlineColor = color
+	highlight.Parent = part
+
+	table.insert(espObjects, highlight)
+end
+
+local function addDistanceLabel(zombie)
+	if zombie:FindFirstChild("ESP_Distance") then return end
 	
-	-- Actualizar velocidad si está activado
-	if speedHackEnabled then
-		local char = player.Character
-		if char then
-			local humanoid = char:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid.WalkSpeed = speedValue
+	local head = zombie:FindFirstChild("Head")
+	if not head then return end
+	
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "ESP_Distance"
+	billboardGui.Adornee = head
+	billboardGui.Size = UDim2.new(0, 100, 0, 40)
+	billboardGui.StudsOffset = Vector3.new(0, 2, 0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = head
+	
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextSize = 16
+	textLabel.TextStrokeTransparency = 0.5
+	textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	textLabel.Parent = billboardGui
+	
+	table.insert(espObjects, billboardGui)
+end
+
+local function createZombieESP(zombie)
+	if cachedZombies[zombie] then return end
+	cachedZombies[zombie] = true
+
+	for _, part in ipairs(zombie:GetChildren()) do
+		if part:IsA("BasePart") then
+			addOutline(part, Color3.fromRGB(255, 0, 0))
+		end
+	end
+	
+	-- Agregar label de distancia
+	addDistanceLabel(zombie)
+end
+
+local function createBoxESP(box)
+	if cachedBoxes[box] then return end
+	cachedBoxes[box] = true
+
+	for _, part in ipairs(box:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name ~= "Part" then
+			addOutline(part, Color3.fromRGB(0, 200, 255))
+		end
+	end
+end
+
+-- Actualizar colores de ESP según distancia
+local lastESPUpdate = 0
+local function updateESPColors()
+	local currentTime = tick()
+	if currentTime - lastESPUpdate < 0.5 then return end -- Cada 0.5 segundos
+	lastESPUpdate = currentTime
+	
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+	
+	for _, zombie in ipairs(baddies:GetChildren()) do
+		local zombieHRP = zombie:FindFirstChild("HumanoidRootPart")
+		local head = zombie:FindFirstChild("Head")
+		
+		if zombieHRP and head then
+			local distance = (hrp.Position - zombieHRP.Position).Magnitude
+			local color = getDistanceColor(distance)
+			
+			-- Actualizar color del ESP
+			for _, part in ipairs(zombie:GetChildren()) do
+				if part:IsA("BasePart") then
+					local highlight = part:FindFirstChild("ESP_Highlight")
+					if highlight then
+						highlight.OutlineColor = color
+					end
+				end
+			end
+			
+			-- Actualizar texto de distancia
+			local distanceGUI = head:FindFirstChild("ESP_Distance")
+			if distanceGUI then
+				local textLabel = distanceGUI:FindFirstChildOfClass("TextLabel")
+				if textLabel then
+					textLabel.Text = math.floor(distance) .. "m"
+					textLabel.TextColor3 = color
+				end
 			end
 		end
 	end
 end
 
--- Hacer el slider arrastrable
+local function clearAll()
+	for _, obj in ipairs(espObjects) do
+		if obj then pcall(function() obj:Destroy() end) end
+	end
+	table.clear(espObjects)
+	table.clear(cachedZombies)
+	table.clear(cachedBoxes)
+end
+
+local function enableESP()
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+
+	for _, z in ipairs(baddies:GetChildren()) do
+		createZombieESP(z)
+	end
+
+	connections.zombieAdded = baddies.ChildAdded:Connect(function(zombie)
+		task.wait(0.1)
+		if enabled then createZombieESP(zombie) end
+	end)
+
+	local interact = workspace:FindFirstChild("Interact")
+	if interact then
+		for _, obj in ipairs(interact:GetChildren()) do
+			if obj.Name == "MysteryBox" then
+				createBoxESP(obj)
+			end
+		end
+	end
+end
+
+-- ===== ZOMBIE FREEZE SYSTEM (VIP) =====
+local frozenZombies = {}
+
+local function freezeZombies()
+	if not isVIP then
+		showStatus("❌ FREEZE es solo VIP", Color3.fromRGB(255, 0, 0))
+		return
+	end
+	
+	if freezeCooldown then
+		local timeLeft = math.ceil(freezeCooldownTime - tick())
+		showStatus("❄️ Cooldown: " .. timeLeft .. "s", Color3.fromRGB(255, 150, 100))
+		return
+	end
+	
+	if freezeActive then
+		showStatus("❄️ Freeze ya está activo", Color3.fromRGB(100, 200, 255))
+		return
+	end
+	
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then
+		showStatus("❌ No hay zombies", Color3.fromRGB(255, 0, 0))
+		return
+	end
+	
+	freezeActive = true
+	local frozenCount = 0
+	
+	-- Congelar todos los zombies
+	for _, zombie in ipairs(baddies:GetChildren()) do
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			-- Guardar velocidad original
+			frozenZombies[zombie] = humanoid.WalkSpeed
+			
+			-- Congelar
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+			
+			-- Efecto visual de hielo
+			for _, part in ipairs(zombie:GetChildren()) do
+				if part:IsA("BasePart") then
+					local ice = Instance.new("SelectionBox")
+					ice.Name = "IceEffect"
+					ice.Adornee = part
+					ice.LineThickness = 0.05
+					ice.Color3 = Color3.fromRGB(100, 200, 255)
+					ice.Parent = part
+				end
+			end
+			
+			frozenCount = frozenCount + 1
+		end
+	end
+	
+	showStatus("❄️ " .. frozenCount .. " ZOMBIES CONGELADOS", Color3.fromRGB(100, 255, 255))
+	
+	-- Descongelar después de 5 segundos
+	task.delay(config.FREEZE_DURATION, function()
+		for zombie, originalSpeed in pairs(frozenZombies) do
+			if zombie and zombie.Parent then
+				local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					humanoid.WalkSpeed = originalSpeed
+					humanoid.JumpPower = 50
+				end
+				
+				-- Remover efecto visual
+				for _, part in ipairs(zombie:GetChildren()) do
+					if part:IsA("BasePart") then
+						local ice = part:FindFirstChild("IceEffect")
+						if ice then ice:Destroy() end
+					end
+				end
+			end
+		end
+		
+		table.clear(frozenZombies)
+		freezeActive = false
+		showStatus("🔥 Zombies descongelados", Color3.fromRGB(255, 150, 100))
+		
+		-- Iniciar cooldown
+		freezeCooldown = true
+		freezeCooldownTime = tick() + config.FREEZE_COOLDOWN
+		
+		task.delay(config.FREEZE_COOLDOWN, function()
+			freezeCooldown = false
+			showStatus("❄️ Freeze listo de nuevo", Color3.fromRGB(100, 255, 150))
+		end)
+	end)
+end
+
+-- ===== KILL COUNTER SYSTEM OPTIMIZADO =====
+local function setupKillCounter()
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then return end
+
+	local function connectZombie(zombie)
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid and not humanoid:GetAttribute("KillTracked") then
+			humanoid:SetAttribute("KillTracked", true)
+			humanoid.Died:Connect(function()
+				if isVIP and showKills then
+					killCount = killCount + 1
+					getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
+					updateKillCounter()
+				end
+			end)
+		end
+	end
+
+	for _, zombie in ipairs(baddies:GetChildren()) do
+		connectZombie(zombie)
+	end
+
+	connections.killCounter = baddies.ChildAdded:Connect(function(zombie)
+		task.wait(0.1)
+		connectZombie(zombie)
+	end)
+end
+
+-- ===== SPEED HACK OPTIMIZADO =====
+local function applySpeed()
+	local char = player.Character
+	if char then
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = speedValue
+		end
+	end
+end
+
+connections.speed = RunService.Heartbeat:Connect(function()
+	if speedHackEnabled then
+		applySpeed()
+	end
+end)
+
+player.CharacterAdded:Connect(function()
+	if speedHackEnabled then
+		task.wait(1)
+		applySpeed()
+	end
+end)
+
+local function toggleSpeedHack()
+	speedHackEnabled = not speedHackEnabled
+	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
+	
+	if speedHackEnabled then
+		applySpeed()
+		showStatus("SPEED HACK | ON", Color3.fromRGB(0, 255, 0))
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+		SpeedButton.Text = "SPEED: ON"
+	else
+		local char = player.Character
+		if char then
+			local humanoid = char:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = 16
+			end
+		end
+		showStatus("SPEED HACK | OFF", Color3.fromRGB(255, 0, 0))
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		SpeedButton.Text = "SPEED: OFF"
+	end
+end
+
+local function updateSlider(value)
+	speedValue = math.clamp(value, config.MIN_SPEED, config.MAX_SPEED)
+	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
+	
+	local percent = (speedValue - config.MIN_SPEED) / (config.MAX_SPEED - config.MIN_SPEED)
+	SliderFill.Size = UDim2.new(percent, 0, 1, 0)
+	SliderButton.Position = UDim2.new(percent, -10, 0.5, -10)
+	SpeedLabel.Text = "Velocidad: " .. math.floor(speedValue)
+	
+	if speedHackEnabled then applySpeed() end
+end
+
+-- Slider dragging optimizado
 local sliderDragging = false
 
 SliderButton.InputBegan:Connect(function(input)
@@ -548,182 +1031,24 @@ SliderButton.InputEnded:Connect(function(input)
 	end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
+connections.sliderDrag = UserInputService.InputChanged:Connect(function(input)
 	if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local mousePos = input.Position.X
-		local sliderPos = SliderBG.AbsolutePosition.X
-		local sliderSize = SliderBG.AbsoluteSize.X
-		
-		local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
-		local newSpeed = MIN_SPEED + (percent * (MAX_SPEED - MIN_SPEED))
-		
-		updateSlider(newSpeed)
+		local percent = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+		updateSlider(config.MIN_SPEED + (percent * (config.MAX_SPEED - config.MIN_SPEED)))
 	end
 end)
 
--- Click en la barra para cambiar velocidad
 SliderBG.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		local mousePos = input.Position.X
-		local sliderPos = SliderBG.AbsolutePosition.X
-		local sliderSize = SliderBG.AbsoluteSize.X
-		
-		local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
-		local newSpeed = MIN_SPEED + (percent * (MAX_SPEED - MIN_SPEED))
-		
-		updateSlider(newSpeed)
+		local percent = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+		updateSlider(config.MIN_SPEED + (percent * (config.MAX_SPEED - config.MIN_SPEED)))
 	end
 end)
 
--- BOTÓN SERVER HOP
-local ServerHopButton = MobileMenu:FindFirstChild("ServerHopButton")
-if not ServerHopButton then
-	ServerHopButton = Instance.new("TextButton")
-	ServerHopButton.Name = "ServerHopButton"
-	ServerHopButton.Size = UDim2.new(0, 240, 0, 50)
-	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 295)
-	ServerHopButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-	ServerHopButton.Text = "🔄 CAMBIAR SERVER"
-	ServerHopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	ServerHopButton.Font = Enum.Font.GothamBold
-	ServerHopButton.TextSize = 18
-	ServerHopButton.Parent = MobileMenu
-
-	local ServerHopCorner = Instance.new("UICorner")
-	ServerHopCorner.CornerRadius = UDim.new(0, 10)
-	ServerHopCorner.Parent = ServerHopButton
-else
-	-- Actualizar posición del botón existente
-	ServerHopButton.Position = UDim2.new(0.5, -120, 0, 295)
-end
-
--- TEXTO DE BIENVENIDA
-local WelcomeText = ScreenGui:FindFirstChild("WelcomeText")
-if not WelcomeText then
-	WelcomeText = Instance.new("TextLabel")
-	WelcomeText.Name = "WelcomeText"
-	WelcomeText.Size = UDim2.new(0, 400, 0, 35)
-	WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
-	WelcomeText.BackgroundTransparency = 0.3
-	WelcomeText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	WelcomeText.Text = isVIP and "Creator = Nobodxy85-bit  :D | 👑 VIP" or "Creator = Nobodxy85-bit  :D"
-	WelcomeText.TextColor3 = isVIP and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(255, 255, 255)
-	WelcomeText.TextTransparency = 0
-	WelcomeText.Font = Enum.Font.GothamBold
-	WelcomeText.TextSize = 18
-	WelcomeText.Visible = true
-	WelcomeText.Parent = ScreenGui
-
-	local WelcomeCorner = Instance.new("UICorner")
-	WelcomeCorner.CornerRadius = UDim.new(0, 10)
-	WelcomeCorner.Parent = WelcomeText
-
-	-- Fade del texto de bienvenida
-	task.spawn(function()
-		task.wait(3)
-		local steps = 30
-		for i = 0, steps do
-			if WelcomeText then
-				WelcomeText.TextTransparency = i / steps
-				WelcomeText.BackgroundTransparency = 0.3 + (0.7 * (i / steps))
-				task.wait(2 / steps)
-			end
-		end
-		if WelcomeText then
-			WelcomeText.Visible = false
-		end
-	end)
-end
-
--- TEXTO DE ESTADO
-local StatusText = ScreenGui:FindFirstChild("StatusText")
-if not StatusText then
-	StatusText = Instance.new("TextLabel")
-	StatusText.Name = "StatusText"
-	StatusText.Size = UDim2.new(0, 300, 0, 35)
-	StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
-	StatusText.BackgroundTransparency = 0.5
-	StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
-	StatusText.Font = Enum.Font.GothamBold
-	StatusText.TextSize = 18
-	StatusText.Visible = false
-	StatusText.Parent = ScreenGui
-end
-
--- ===== FUNCION FADE =====
-local function fadeOut(label, duration)
-	local steps = 30
-	for i = 0, steps do
-		if label then
-			label.TextTransparency = i / steps
-			task.wait(duration / steps)
-		end
-	end
-	if label then
-		label.Visible = false
-	end
-end
-
--- ===== FUNCION MOSTRAR ESTADO =====
-local function showStatus(text, color)
-	if not StatusText then return end
-	
-	StatusText.Text = text
-	StatusText.TextColor3 = color
-	StatusText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	StatusText.Visible = true
-	StatusText.TextTransparency = 0
-	StatusText.BackgroundTransparency = 0.5
-	
-	task.spawn(function()
-		task.wait(2)
-		fadeOut(StatusText, 1)
-	end)
-end
-
--- ===== FUNCIÓN SERVER HOP =====
-local function serverHop()
-	showStatus("🔄 Buscando servidor...", Color3.fromRGB(100, 150, 255))
-	
-	-- Guardar estado antes de cambiar
-	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
-	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
-	getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
-	getgenv().ESP_ZOMBIES_CONFIG.speedValue = speedValue
-	getgenv().ESP_ZOMBIES_CONFIG.firstTimeKeyboard = firstTimeKeyboard
-	getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
-	getgenv().ESP_ZOMBIES_CONFIG.showKills = showKills
-	
-	local success, errorMsg = pcall(function()
-		local servers = {}
-		local req = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-		local body = game:GetService("HttpService"):JSONDecode(req)
-		
-		if body and body.data then
-			for i, v in next, body.data do
-				if v.id ~= game.JobId and v.playing < v.maxPlayers then
-					table.insert(servers, v.id)
-				end
-			end
-		end
-		
-		if #servers > 0 then
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
-		else
-			showStatus("❌ No hay servidores disponibles", Color3.fromRGB(255, 0, 0))
-		end
-	end)
-	
-	if not success then
-		showStatus("❌ Error al cambiar servidor", Color3.fromRGB(255, 0, 0))
-		warn("Server Hop Error:", errorMsg)
-	end
-end
-
+-- ===== AIMBOT OPTIMIZADO =====
 local function getClosestZombieToCursor()
-	local closest = nil
 	local shortest = math.huge
+	local closest = nil
 	local mousePos = UserInputService:GetMouseLocation()
 
 	local baddies = workspace:FindFirstChild("Baddies")
@@ -748,179 +1073,7 @@ local function getClosestZombieToCursor()
 	return closest
 end
 
--- ===== SPEED HACK FUNCTIONS =====
-local function applySpeed()
-    local char = player.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").WalkSpeed = speedValue
-    end
-end
-
--- Esto fuerza la velocidad en cada frame para que el juego no la baje
-if speedConnection then speedConnection:Disconnect() end
-speedConnection = RunService.Heartbeat:Connect(function()
-    if speedHackEnabled then
-        applySpeed()
-    end
-end)
-
--- Esto asegura que funcione cuando mueras y reaparezcas
-player.CharacterAdded:Connect(function()
-    if speedHackEnabled then
-        task.wait(1) -- Espera a que el server cargue el personaje
-        applySpeed()
-    end
-end)
-
-local function toggleSpeedHack()
-    speedHackEnabled = not speedHackEnabled
-    getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled = speedHackEnabled
-    
-    if speedHackEnabled then
-        applySpeed()
-        showStatus("SPEED HACK | ON", Color3.fromRGB(0, 255, 0))
-        SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-        SpeedButton.Text = "SPEED: ON"
-    else
-        local char = player.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-        end
-        showStatus("SPEED HACK | OFF", Color3.fromRGB(255, 0, 0))
-        SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        SpeedButton.Text = "SPEED: OFF"
-    end
-end
-
-local function increaseSpeed()
-	if speedValue < MAX_SPEED then
-		updateSlider(speedValue + SPEED_INCREMENT)
-		showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
-	end
-end
-
-local function decreaseSpeed()
-	if speedValue > MIN_SPEED then
-		updateSlider(speedValue - SPEED_INCREMENT)
-		showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
-	end
-end
-
--- ===== KILL COUNTER SYSTEM =====
-local function setupKillCounter()
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not baddies then return end
-
-	-- Monitorear la salud de los zombies
-	for _, zombie in ipairs(baddies:GetChildren()) do
-		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.Died:Connect(function()
-				if isVIP and showKills then
-					killCount = killCount + 1
-					getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
-					updateKillCounter()
-				end
-			end)
-		end
-	end
-
-	-- Monitorear nuevos zombies
-	baddies.ChildAdded:Connect(function(zombie)
-		task.wait(0.1)
-		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.Died:Connect(function()
-				if isVIP and showKills then
-					killCount = killCount + 1
-					getgenv().ESP_ZOMBIES_CONFIG.killCount = killCount
-					updateKillCounter()
-				end
-			end)
-		end
-	end)
-end
-
--- ===== ESP (SOLO BORDES) =====
-local function addOutline(part, color)
-	if not part:IsA("BasePart") or part:FindFirstChild("ESP_Highlight") then return end
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "ESP_Highlight"
-	highlight.Adornee = part
-	highlight.FillTransparency = 1
-	highlight.OutlineTransparency = 0
-	highlight.OutlineColor = color
-	highlight.Parent = part
-
-	table.insert(espObjects, highlight)
-end
-
-local function createZombieESP(zombie)
-	if cachedZombies[zombie] then return end
-	cachedZombies[zombie] = true
-
-	for _, part in ipairs(zombie:GetChildren()) do
-		if part:IsA("BasePart") then
-			addOutline(part, Color3.fromRGB(255, 0, 0))
-		end
-	end
-end
-
-local function createBoxESP(box)
-	if cachedBoxes[box] then return end
-	cachedBoxes[box] = true
-
-	for _, part in ipairs(box:GetDescendants()) do
-		if part:IsA("BasePart") and part.Name ~= "Part" then
-			addOutline(part, Color3.fromRGB(0, 200, 255))
-		end
-	end
-end
-
--- ===== LIMPIAR =====
-local function clearAll()
-	for _, obj in ipairs(espObjects) do
-		if obj then obj:Destroy() end
-	end
-
-	if zombieAddedConnection then
-		zombieAddedConnection:Disconnect()
-		zombieAddedConnection = nil
-	end
-
-	table.clear(espObjects)
-	table.clear(cachedZombies)
-	table.clear(cachedBoxes)
-end
-
--- ===== ACTIVAR ESP =====
-local function enableESP()
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not baddies then return end
-
-	for _, z in ipairs(baddies:GetChildren()) do
-		createZombieESP(z)
-	end
-
-	zombieAddedConnection = baddies.ChildAdded:Connect(function(zombie)
-		task.wait(0.1)
-		if enabled then
-			createZombieESP(zombie)
-		end
-	end)
-
-	local interact = workspace:FindFirstChild("Interact")
-	if interact then
-		for _, obj in ipairs(interact:GetChildren()) do
-			if obj.Name == "MysteryBox" then
-				createBoxESP(obj)
-			end
-		end
-	end
-end
-
--- ===== TOGGLE ESP =====
+-- ===== TOGGLE FUNCTIONS =====
 local function toggleESP(fromKeyboard)
 	enabled = not enabled
 	getgenv().ESP_ZOMBIES_CONFIG.espEnabled = enabled
@@ -933,11 +1086,11 @@ local function toggleESP(fromKeyboard)
 
 	if enabled then
 		enableESP()
-		-- Activar kill counter solo para VIP cuando se activa ESP
 		if isVIP then
 			showKills = true
 			getgenv().ESP_ZOMBIES_CONFIG.showKills = true
-			KillCounterLabel.Visible = true
+			KillCounterFrame.Visible = true
+			InfoHUD.Visible = true
 			updateKillCounter()
 		end
 		showStatus("ESP | ENABLE", Color3.fromRGB(0, 255, 0))
@@ -946,11 +1099,11 @@ local function toggleESP(fromKeyboard)
 	else
 		clearAll()
 		AlertText.Visible = false
-		-- Desactivar kill counter cuando se desactiva ESP
 		if isVIP then
 			showKills = false
 			getgenv().ESP_ZOMBIES_CONFIG.showKills = false
-			KillCounterLabel.Visible = false
+			KillCounterFrame.Visible = false
+			InfoHUD.Visible = false
 		end
 		showStatus("ESP | DISABLE", Color3.fromRGB(255, 0, 0))
 		ESPButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
@@ -958,7 +1111,6 @@ local function toggleESP(fromKeyboard)
 	end
 end
 
--- ===== TOGGLE AIMBOT =====
 local function toggleAimbot()
 	aimbotEnabled = not aimbotEnabled
 	getgenv().ESP_ZOMBIES_CONFIG.aimbotEnabled = aimbotEnabled
@@ -977,217 +1129,171 @@ end
 -- ===== EVENTOS BOTONES =====
 CircleButton.MouseButton1Click:Connect(function()
 	MobileMenu.Visible = not MobileMenu.Visible
+	CircleButton.BackgroundColor3 = MobileMenu.Visible and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(50, 50, 50)
+	UIStroke.Color = MobileMenu.Visible and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 255, 255)
+end)
+
+ESPButton.MouseButton1Click:Connect(function() toggleESP(false) end)
+AimbotButton.MouseButton1Click:Connect(function() toggleAimbot() end)
+SpeedButton.MouseButton1Click:Connect(function() toggleSpeedHack() end)
+ServerHopButton.MouseButton1Click:Connect(function() serverHop() end)
+
+-- ===== BUCLE PRINCIPAL OPTIMIZADO =====
+local lastAlertCheck = 0
+local lastHUDUpdate = 0
+connections.render = RunService.RenderStepped:Connect(function()
+	local currentTime = tick()
 	
-	if MobileMenu.Visible then
-		CircleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-		CircleButton:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(0, 200, 255)
-	else
-		CircleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		CircleButton:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(255, 255, 255)
+	-- Actualizar Info HUD (cada 0.5 segundos)
+	if isVIP and InfoHUD and InfoHUD.Visible and currentTime - lastHUDUpdate > 0.5 then
+		lastHUDUpdate = currentTime
+		updateInfoHUD()
 	end
-end)
-
-ESPButton.MouseButton1Click:Connect(function()
-	toggleESP(false)
-end)
-
-AimbotButton.MouseButton1Click:Connect(function()
-	toggleAimbot()
-end)
-
-SpeedButton.MouseButton1Click:Connect(function()
-	toggleSpeedHack()
-end)
-
-ServerHopButton.MouseButton1Click:Connect(function()
-	serverHop()
-end)
-
--- ===== BUCLE PRINCIPAL =====
-renderConnection = RunService.RenderStepped:Connect(function()
-	-- ===== ALERTA ZOMBIES =====
-	if not enabled then
-		if AlertText then AlertText.Visible = false end
-	else
+	
+	-- Actualizar colores ESP según distancia
+	if enabled then
+		updateESPColors()
+	end
+	
+	-- Alerta zombies (cada 0.2 segundos)
+	if enabled and currentTime - lastAlertCheck > 0.2 then
+		lastAlertCheck = currentTime
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		local baddies = workspace:FindFirstChild("Baddies")
 
-		if hrp and baddies and AlertText then
+		if hrp and baddies then
 			local count = 0
-
 			for _, z in ipairs(baddies:GetChildren()) do
 				local root = z:FindFirstChild("HumanoidRootPart")
 				local humanoid = z:FindFirstChildOfClass("Humanoid")
 
 				if root and humanoid and humanoid.Health > 0 then
-					if (hrp.Position - root.Position).Magnitude <= ALERT_DISTANCE then
-						count += 1
+					if (hrp.Position - root.Position).Magnitude <= config.ALERT_DISTANCE then
+						count = count + 1
 					end
 				end
 			end
 
+			AlertText.Visible = count > 0
 			if count > 0 then
 				AlertText.Text = "⚠ ZOMBIE CERCA (x" .. count .. ")"
-				AlertText.Visible = true
-			else
-				AlertText.Visible = false
 			end
 		end
 	end
 
-	-- ===== AIMBOT CON SUAVIZADO =====
+	-- Aimbot
 	if aimbotEnabled then
 		local head = getClosestZombieToCursor()
 		if head then
 			local targetCFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-			Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
+			Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, config.SMOOTHNESS)
 		end
 	end
 end)
 
--- ===== CONTROLES DE TECLADO (PC) =====
-inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
+-- ===== CONTROLES DE TECLADO =====
+connections.input = UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
-	if input.KeyCode == Enum.KeyCode.T then
+	local key = input.KeyCode
+	
+	if key == Enum.KeyCode.T then
 		toggleESP(true)
-	end
-
-	if input.KeyCode == Enum.KeyCode.C then
+	elseif key == Enum.KeyCode.C then
 		toggleAimbot()
-	end
-	
-	if input.KeyCode == Enum.KeyCode.H then
+	elseif key == Enum.KeyCode.H then
 		serverHop()
-	end
-	
-	if input.KeyCode == Enum.KeyCode.E then
+	elseif key == Enum.KeyCode.E then
 		toggleSpeedHack()
-	end
-	
-	-- Control de velocidad con + y -
-	if input.KeyCode == Enum.KeyCode.Equals or input.KeyCode == Enum.KeyCode.K then
-		increaseSpeed()
-	end
-	
-	if input.KeyCode == Enum.KeyCode.L then
-		decreaseSpeed()
-	end
-
-	-- ===== M PARA VERIFICAR SI ERES VIP =====
-	if input.KeyCode == Enum.KeyCode.M then
+	elseif key == Enum.KeyCode.K or key == Enum.KeyCode.Equals then
+		if speedValue < config.MAX_SPEED then
+			updateSlider(speedValue + config.SPEED_INCREMENT)
+			showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
+		end
+	elseif key == Enum.KeyCode.L then
+		if speedValue > config.MIN_SPEED then
+			updateSlider(speedValue - config.SPEED_INCREMENT)
+			showStatus("Velocidad: " .. math.floor(speedValue), Color3.fromRGB(0, 200, 255))
+		end
+	elseif key == Enum.KeyCode.M then
 		if isVIP then
 			showStatus("👑 VIP ACTIVO | ID: " .. player.UserId, Color3.fromRGB(255, 215, 0))
-			print("👑 Eres VIP")
-			print("📌 Y = Cambiar opción de TP")
-			print("📌 Z = Ejecutar TP")
-			print("📌 R = Reset Kills")
+			print("👑 Eres VIP\n📌 Y = Cambiar TP\n📌 Z = Ejecutar TP\n📌 X = Zombie Freeze\n📌 V = Toggle Info HUD")
 		else
 			showStatus("❌ NO ERES VIP | Tu ID: " .. player.UserId, Color3.fromRGB(255, 0, 0))
 			print("❌ Tu UserID es: " .. player.UserId)
-			print("⚠️ Agrega este ID a VIP_USER_IDS en el script para activar VIP")
 		end
-	end
-
-	-- ===== VIP TELEPORT CONTROLS =====
-	if isVIP then
-		-- Y = Cambiar opción de TP
-		if input.KeyCode == Enum.KeyCode.Y then
+	elseif isVIP then
+		if key == Enum.KeyCode.Y then
 			cycleTPOption()
 			if TPSelectorLabel then
 				TPSelectorLabel.Visible = true
-				-- Auto-ocultar después de 3 segundos
-				task.spawn(function()
-					task.wait(3)
-					if TPSelectorLabel then
-						TPSelectorLabel.Visible = false
-					end
+				task.delay(3, function()
+					if TPSelectorLabel then TPSelectorLabel.Visible = false end
 				end)
 			end
-		end
-
-		-- Z = Ejecutar TP
-		if input.KeyCode == Enum.KeyCode.Z then
+		elseif key == Enum.KeyCode.Z then
 			executeTP()
-		end
-
-		-- P = Reset Kills
-		if input.KeyCode == Enum.KeyCode.P then
-			killCount = 0
-			getgenv().ESP_ZOMBIES_CONFIG.killCount = 0
-			updateKillCounter()
-			showStatus("🔄 Kills reseteados", Color3.fromRGB(0, 255, 255))
+		elseif key == Enum.KeyCode.X then
+			freezeZombies()
+		elseif key == Enum.KeyCode.V then
+			if InfoHUD then
+				InfoHUD.Visible = not InfoHUD.Visible
+				showStatus(InfoHUD.Visible and "📊 Info HUD: ON" or "📊 Info HUD: OFF", 
+					InfoHUD.Visible and Color3.fromRGB(100, 255, 150) or Color3.fromRGB(255, 100, 100))
+			end
 		end
 	end
 end)
 
--- ===== LIMPIEZA SOLO CUANDO SE CIERRE ROBLOX =====
+-- ===== LIMPIEZA =====
 local function cleanup()
-	print("🧹 Limpiando conexiones del ESP...")
-	if renderConnection then renderConnection:Disconnect() end
-	if inputConnection then inputConnection:Disconnect() end
-	if zombieAddedConnection then zombieAddedConnection:Disconnect() end
-	if speedConnection then speedConnection:Disconnect() end
-	if killCounterConnection then killCounterConnection:Disconnect() end
+	for name, conn in pairs(connections) do
+		if conn then pcall(function() conn:Disconnect() end) end
+	end
 	clearAll()
 end
 
--- Solo limpiar cuando el jugador se va del juego completamente
 Players.PlayerRemoving:Connect(function(plr)
-	if plr == player then
-		cleanup()
-	end
+	if plr == player then cleanup() end
 end)
 
--- ===== ACTIVAR PERSISTENCIA =====
+-- ===== INICIALIZACIÓN =====
 setupAutoReload()
-
--- ===== SETUP KILL COUNTER =====
 setupKillCounter()
 
--- ===== AUTO REACTIVAR SI ESTABA ENCENDIDO =====
 task.spawn(function()
 	task.wait(1)
 	if getgenv().ESP_ZOMBIES_CONFIG.espEnabled then
-		print("🔄 Reactivando ESP automáticamente...")
 		enableESP()
 		if isVIP then
 			showKills = true
-			KillCounterLabel.Visible = true
+			KillCounterFrame.Visible = true
+			InfoHUD.Visible = true
 			updateKillCounter()
 		end
 		showStatus("ESP | AUTO-ACTIVADO", Color3.fromRGB(0, 255, 0))
 	end
 	
 	if getgenv().ESP_ZOMBIES_CONFIG.speedHackEnabled then
-		print("🔄 Reactivando Speed Hack automáticamente...")
 		toggleSpeedHack()
 	end
 end)
 
-print("✅ ESP Script con persistencia, Speed Hack y VIP System cargado!")
-print("📌 Controles:")
-print("   T = Toggle ESP" .. (isVIP and " + Kill Counter 💀" or ""))
-print("   C = Toggle Aimbot")
-print("   E = Toggle Speed Hack")
-print("   K = Aumentar Velocidad")
-print("   L = Disminuir Velocidad")
-print("   H = Server Hop")
-print("   M = Verificar VIP Status")
+print("✅ ESP Script OPTIMIZADO cargado!")
+print("📌 T = ESP con Distancia | C = Aimbot | E = Speed | H = Server Hop")
+print("📌 K = Velocidad+ | L = Velocidad-")
 if isVIP then
-	print("   Y = Cambiar opción de TP (👑 VIP)")
-	print("   Z = Ejecutar TP (👑 VIP)")
-	print("   R = Reset Kills (👑 VIP)")
-	print("   🎯 Tu UserID: " .. player.UserId .. " ✅ VIP ACTIVO")
-	print("   💀 Kill Counter se activa automáticamente con ESP")
+	print("👑 VIP FEATURES:")
+	print("   Y = Cambiar TP | Z = Ejecutar TP")
+	print("   X = Zombie Freeze (5s - CD 15s)")
+	print("   V = Toggle Info HUD")
+	print("   📊 Kill Counter automático con ESP")
+	print("👑 VIP ACTIVO | ID: " .. player.UserId)
 else
-	print("   ⚠️ No eres VIP - Presiona M para ver tu UserID")
+	print("📌 M = Verificar VIP")
 end
-print("   Botón ⚙️ = Abrir menú")
-print("   Botón 🔄 = Cambiar servidor")
-print("🔒 La GUI permanecerá visible incluso al morir")
 ]==]
 
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
-
