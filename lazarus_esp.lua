@@ -63,6 +63,10 @@ local freezeActive = false
 local freezeCooldown = false
 local freezeCooldownTime = 0
 
+-- Noclip variables
+local noclipActive = false
+local noclipConnection
+
 local Camera = workspace.CurrentCamera
 
 -- ===== CACHES (OPTIMIZACIÓN) =====
@@ -682,6 +686,46 @@ local function serverHop()
 	end)
 end
 
+local function enableNoclipForSeconds(seconds)
+	if noclipActive then return end
+	noclipActive = true
+
+	local char = player.Character
+	if not char then return end
+
+	-- Conexión noclip
+	noclipConnection = RunService.Stepped:Connect(function()
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end)
+
+	showStatus("👻 NOCLIP ACTIVADO (" .. seconds .. "s)", Color3.fromRGB(180, 180, 255))
+
+	-- Desactivar después de X segundos
+	task.delay(seconds, function()
+		if noclipConnection then
+			noclipConnection:Disconnect()
+			noclipConnection = nil
+		end
+
+		-- Restaurar colisiones
+		if char then
+			for _, part in ipairs(char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = true
+				end
+			end
+		end
+
+		noclipActive = false
+		showStatus("🧱 NOCLIP DESACTIVADO", Color3.fromRGB(255, 150, 150))
+	end)
+end
+
+
 -- ===== ESP OPTIMIZADO CON DISTANCIA =====
 local function getDistanceColor(distance)
 	if distance > 30 then
@@ -1235,6 +1279,7 @@ connections.input = UserInputService.InputBegan:Connect(function(input, gp)
 			end
 		elseif key == Enum.KeyCode.Z then
 			executeTP()
+			enableNoclipForSeconds(3)
 		elseif key == Enum.KeyCode.X then
 			freezeZombies()
 		elseif key == Enum.KeyCode.T then
@@ -1297,3 +1342,4 @@ end
 ]==]
 
 loadstring(getgenv().ESP_ZOMBIES_SOURCE)()
+
