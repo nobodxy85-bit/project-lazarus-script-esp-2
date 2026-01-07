@@ -1,8 +1,7 @@
--- ESP ZOMBIES OPTIMIZADO V2
+-- ESP ZOMBIES OPTIMIZADO + VIP SYSTEM
 -- Creator = Nobodxy85-bit
--- Sin persistencia ni noclip - Mejor rendimiento
+-- Versión sin noclip y sin persistencia
 
--- ===== PREVENIR CARGA MÚLTIPLE =====
 if _G.ESP_ZOMBIES_LOADED then
 	warn("⚠️ ESP Script ya está cargado")
 	return
@@ -33,13 +32,9 @@ local config = {
 	MAX_SPEED = 200,
 	SPEED_INCREMENT = 5,
 	FREEZE_DURATION = 5,
-	FREEZE_COOLDOWN = 15,
-	ESP_UPDATE_RATE = 0.5, -- Actualizar ESP cada 0.5s
-	HUD_UPDATE_RATE = 0.5, -- Actualizar HUD cada 0.5s
-	ALERT_UPDATE_RATE = 0.2 -- Verificar alertas cada 0.2s
+	FREEZE_COOLDOWN = 15
 }
 
--- ===== VARIABLES =====
 local enabled = false
 local aimbotEnabled = false
 local speedHackEnabled = false
@@ -48,15 +43,14 @@ local killCount = 0
 local showKills = false
 local firstTimeKeyboard = true
 
--- Zombie Freeze
+-- Zombie Freeze variables
 local freezeActive = false
 local freezeCooldown = false
 local freezeCooldownTime = 0
-local frozenZombies = {}
 
 local Camera = workspace.CurrentCamera
 
--- ===== CACHES =====
+-- ===== CACHES (OPTIMIZACIÓN) =====
 local espObjects = {}
 local cachedZombies = {}
 local cachedBoxes = {}
@@ -64,76 +58,115 @@ local connections = {}
 
 -- ===== GUI =====
 local PlayerGui = player:WaitForChild("PlayerGui")
-local ScreenGui = Instance.new("ScreenGui")
+local ScreenGui = PlayerGui:FindFirstChild("ESP_GUI") or Instance.new("ScreenGui")
 ScreenGui.Name = "ESP_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- ===== KILL COUNTER =====
-local KillCounterFrame = Instance.new("Frame")
-KillCounterFrame.Name = "KillCounterFrame"
-KillCounterFrame.Size = UDim2.new(0, 200, 0, 60)
-KillCounterFrame.Position = UDim2.new(0.5, -100, 0.015, 0)
-KillCounterFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-KillCounterFrame.BackgroundTransparency = 0.2
-KillCounterFrame.BorderSizePixel = 0
-KillCounterFrame.Visible = false
-KillCounterFrame.Parent = ScreenGui
+-- ===== KILL COUNTER MEJORADO =====
+local KillCounterFrame = ScreenGui:FindFirstChild("KillCounterFrame")
+if not KillCounterFrame then
+	KillCounterFrame = Instance.new("Frame")
+	KillCounterFrame.Name = "KillCounterFrame"
+	KillCounterFrame.Size = UDim2.new(0, 200, 0, 60)
+	KillCounterFrame.Position = UDim2.new(0.5, -100, 0.015, 0)
+	KillCounterFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	KillCounterFrame.BackgroundTransparency = 0.2
+	KillCounterFrame.BorderSizePixel = 0
+	KillCounterFrame.Visible = false
+	KillCounterFrame.Parent = ScreenGui
 
-local FrameCorner = Instance.new("UICorner")
-FrameCorner.CornerRadius = UDim.new(0, 12)
-FrameCorner.Parent = KillCounterFrame
+	local FrameCorner = Instance.new("UICorner")
+	FrameCorner.CornerRadius = UDim.new(0, 12)
+	FrameCorner.Parent = KillCounterFrame
 
-local FrameStroke = Instance.new("UIStroke")
-FrameStroke.Color = Color3.fromRGB(255, 215, 0)
-FrameStroke.Thickness = 2
-FrameStroke.Transparency = 0.3
-FrameStroke.Parent = KillCounterFrame
+	local FrameStroke = Instance.new("UIStroke")
+	FrameStroke.Color = Color3.fromRGB(255, 215, 0)
+	FrameStroke.Thickness = 2
+	FrameStroke.Transparency = 0.3
+	FrameStroke.Parent = KillCounterFrame
 
-local Gradient = Instance.new("UIGradient")
-Gradient.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 25)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))
-}
-Gradient.Rotation = 90
-Gradient.Parent = KillCounterFrame
+	-- Gradiente
+	local Gradient = Instance.new("UIGradient")
+	Gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))
+	}
+	Gradient.Rotation = 90
+	Gradient.Parent = KillCounterFrame
 
-local KillIcon = Instance.new("TextLabel")
-KillIcon.Name = "KillIcon"
-KillIcon.Size = UDim2.new(0, 35, 0, 35)
-KillIcon.Position = UDim2.new(0, 10, 0.5, -17.5)
-KillIcon.BackgroundTransparency = 1
-KillIcon.Text = "💀"
-KillIcon.TextColor3 = Color3.fromRGB(255, 80, 80)
-KillIcon.Font = Enum.Font.GothamBold
-KillIcon.TextSize = 28
-KillIcon.Parent = KillCounterFrame
+	-- Kill Icon
+	local KillIcon = Instance.new("TextLabel")
+	KillIcon.Name = "KillIcon"
+	KillIcon.Size = UDim2.new(0, 35, 0, 35)
+	KillIcon.Position = UDim2.new(0, 10, 0.5, -17.5)
+	KillIcon.BackgroundTransparency = 1
+	KillIcon.Text = "💀"
+	KillIcon.TextColor3 = Color3.fromRGB(255, 80, 80)
+	KillIcon.Font = Enum.Font.GothamBold
+	KillIcon.TextSize = 28
+	KillIcon.Parent = KillCounterFrame
 
-local KillCount = Instance.new("TextLabel")
-KillCount.Name = "KillCount"
-KillCount.Size = UDim2.new(0, 145, 0, 30)
-KillCount.Position = UDim2.new(0, 50, 0, 5)
-KillCount.BackgroundTransparency = 1
-KillCount.Text = "0"
-KillCount.TextColor3 = Color3.fromRGB(255, 255, 255)
-KillCount.Font = Enum.Font.GothamBold
-KillCount.TextSize = 32
-KillCount.TextXAlignment = Enum.TextXAlignment.Left
-KillCount.TextStrokeTransparency = 0.5
-KillCount.Parent = KillCounterFrame
+	-- Kill Count
+	local KillCount = Instance.new("TextLabel")
+	KillCount.Name = "KillCount"
+	KillCount.Size = UDim2.new(0, 145, 0, 30)
+	KillCount.Position = UDim2.new(0, 50, 0, 5)
+	KillCount.BackgroundTransparency = 1
+	KillCount.Text = "0"
+	KillCount.TextColor3 = Color3.fromRGB(255, 255, 255)
+	KillCount.Font = Enum.Font.GothamBold
+	KillCount.TextSize = 32
+	KillCount.TextXAlignment = Enum.TextXAlignment.Left
+	KillCount.TextStrokeTransparency = 0.5
+	KillCount.Parent = KillCounterFrame
 
-local KillLabel = Instance.new("TextLabel")
-KillLabel.Name = "KillLabel"
-KillLabel.Size = UDim2.new(0, 145, 0, 20)
-KillLabel.Position = UDim2.new(0, 50, 0, 35)
-KillLabel.BackgroundTransparency = 1
-KillLabel.Text = "KILLS"
-KillLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-KillLabel.Font = Enum.Font.GothamBold
-KillLabel.TextSize = 14
-KillLabel.TextXAlignment = Enum.TextXAlignment.Left
-KillLabel.TextTransparency = 0.3
-KillLabel.Parent = KillCounterFrame
+	-- Kill Label
+	local KillLabel = Instance.new("TextLabel")
+	KillLabel.Name = "KillLabel"
+	KillLabel.Size = UDim2.new(0, 145, 0, 20)
+	KillLabel.Position = UDim2.new(0, 50, 0, 35)
+	KillLabel.BackgroundTransparency = 1
+	KillLabel.Text = "KILLS"
+	KillLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	KillLabel.Font = Enum.Font.GothamBold
+	KillLabel.TextSize = 14
+	KillLabel.TextXAlignment = Enum.TextXAlignment.Left
+	KillLabel.TextTransparency = 0.3
+	KillLabel.Parent = KillCounterFrame
+end
+
+-- Actualizar contador con animación optimizada
+local lastKillTime = 0
+local function updateKillCounter()
+	if not KillCounterFrame then return end
+	
+	local killCountLabel = KillCounterFrame:FindFirstChild("KillCount")
+	local killIcon = KillCounterFrame:FindFirstChild("KillIcon")
+	local frameStroke = KillCounterFrame:FindFirstChild("UIStroke")
+	
+	if killCountLabel then
+		killCountLabel.Text = tostring(killCount)
+		
+		-- Animación optimizada (solo si pasó suficiente tiempo)
+		local currentTime = tick()
+		if currentTime - lastKillTime > 0.1 then
+			lastKillTime = currentTime
+			task.spawn(function()
+				-- Pulso en número
+				killCountLabel.TextSize = 36
+				if killIcon then killIcon.TextSize = 32 end
+				if frameStroke then frameStroke.Transparency = 0 end
+				
+				task.wait(0.08)
+				
+				killCountLabel.TextSize = 32
+				if killIcon then killIcon.TextSize = 28 end
+				if frameStroke then frameStroke.Transparency = 0.3 end
+			end)
+		end
+	end
+end
 
 -- ===== INFO HUD (VIP) =====
 local InfoHUD
@@ -158,6 +191,7 @@ if isVIP then
 	HUDStroke.Transparency = 0.3
 	HUDStroke.Parent = InfoHUD
 
+	-- Título
 	local HUDTitle = Instance.new("TextLabel")
 	HUDTitle.Size = UDim2.new(1, -20, 0, 25)
 	HUDTitle.Position = UDim2.new(0, 10, 0, 5)
@@ -169,6 +203,7 @@ if isVIP then
 	HUDTitle.TextXAlignment = Enum.TextXAlignment.Left
 	HUDTitle.Parent = InfoHUD
 
+	-- Ronda
 	local RoundLabel = Instance.new("TextLabel")
 	RoundLabel.Name = "RoundLabel"
 	RoundLabel.Size = UDim2.new(1, -20, 0, 20)
@@ -181,6 +216,7 @@ if isVIP then
 	RoundLabel.TextXAlignment = Enum.TextXAlignment.Left
 	RoundLabel.Parent = InfoHUD
 
+	-- Zombies vivos
 	local ZombiesLabel = Instance.new("TextLabel")
 	ZombiesLabel.Name = "ZombiesLabel"
 	ZombiesLabel.Size = UDim2.new(1, -20, 0, 20)
@@ -193,6 +229,7 @@ if isVIP then
 	ZombiesLabel.TextXAlignment = Enum.TextXAlignment.Left
 	ZombiesLabel.Parent = InfoHUD
 
+	-- Velocidad actual
 	local SpeedLabel = Instance.new("TextLabel")
 	SpeedLabel.Name = "SpeedLabel"
 	SpeedLabel.Size = UDim2.new(1, -20, 0, 20)
@@ -205,6 +242,7 @@ if isVIP then
 	SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
 	SpeedLabel.Parent = InfoHUD
 
+	-- Freeze Cooldown
 	local FreezeLabel = Instance.new("TextLabel")
 	FreezeLabel.Name = "FreezeLabel"
 	FreezeLabel.Size = UDim2.new(1, -20, 0, 20)
@@ -218,11 +256,60 @@ if isVIP then
 	FreezeLabel.Parent = InfoHUD
 end
 
--- ===== TP SELECTOR (VIP) =====
+-- Función para actualizar Info HUD
+local function updateInfoHUD()
+	if not InfoHUD then return end
+	
+	local roundLabel = InfoHUD:FindFirstChild("RoundLabel")
+	local zombiesLabel = InfoHUD:FindFirstChild("ZombiesLabel")
+	local speedLabelHUD = InfoHUD:FindFirstChild("SpeedLabel")
+	local freezeLabel = InfoHUD:FindFirstChild("FreezeLabel")
+	
+	-- Actualizar ronda (buscar en workspace)
+	if roundLabel then
+		local roundValue = workspace:FindFirstChild("RoundValue") or workspace:FindFirstChild("Round")
+		if roundValue and roundValue:IsA("IntValue") then
+			roundLabel.Text = "🎯 RONDA: " .. roundValue.Value
+		else
+			roundLabel.Text = "🎯 RONDA: --"
+		end
+	end
+	
+	-- Actualizar zombies vivos
+	if zombiesLabel then
+		local baddies = workspace:FindFirstChild("Baddies")
+		local count = baddies and #baddies:GetChildren() or 0
+		zombiesLabel.Text = "💀 ZOMBIES: " .. count
+	end
+	
+	-- Actualizar velocidad
+	if speedLabelHUD then
+		local char = player.Character
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		local currentSpeed = humanoid and math.floor(humanoid.WalkSpeed) or 16
+		speedLabelHUD.Text = "⚡ VELOCIDAD: " .. currentSpeed
+	end
+	
+	-- Actualizar freeze cooldown
+	if freezeLabel then
+		if freezeActive then
+			freezeLabel.Text = "❄️ FREEZE: ACTIVO"
+			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 255)
+		elseif freezeCooldown then
+			local timeLeft = math.ceil(freezeCooldownTime - tick())
+			freezeLabel.Text = "❄️ FREEZE: " .. timeLeft .. "s"
+			freezeLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
+		else
+			freezeLabel.Text = "❄️ FREEZE: LISTO"
+			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
+		end
+	end
+end
+
 local currentTPOption = 1
 local TPOptions = {"SIN TP", "PACK-A-PUNCH", "MYSTERY BOX"}
-local TPSelectorLabel
 
+local TPSelectorLabel
 if isVIP then
 	TPSelectorLabel = Instance.new("TextLabel")
 	TPSelectorLabel.Name = "TPSelectorLabel"
@@ -239,7 +326,13 @@ if isVIP then
 	TPSelectorLabel.Parent = ScreenGui
 end
 
--- ===== ALERT TEXT =====
+local function updateTPSelector()
+	if TPSelectorLabel then
+		TPSelectorLabel.Text = "📍 " .. TPOptions[currentTPOption]
+	end
+end
+
+-- ===== OTROS ELEMENTOS GUI =====
 local AlertText = Instance.new("TextLabel")
 AlertText.Name = "AlertText"
 AlertText.Size = UDim2.new(0, 360, 0, 50)
@@ -252,7 +345,6 @@ AlertText.TextStrokeTransparency = 0.3
 AlertText.Visible = false
 AlertText.Parent = ScreenGui
 
--- ===== BOTÓN CIRCULAR =====
 local CircleButton = Instance.new("TextButton")
 CircleButton.Name = "CircleButton"
 CircleButton.Size = UDim2.new(0, 80, 0, 80)
@@ -274,7 +366,7 @@ UIStroke.Color = Color3.fromRGB(255, 255, 255)
 UIStroke.Thickness = 3
 UIStroke.Parent = CircleButton
 
--- Botón arrastrable
+-- Botón arrastrable (optimizado)
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -310,7 +402,7 @@ connections.drag = UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- ===== MENU MÓVIL =====
+-- MENU MÓVIL
 local MobileMenu = Instance.new("Frame")
 MobileMenu.Name = "MobileMenu"
 MobileMenu.Size = UDim2.new(0, 280, 0, 380)
@@ -330,7 +422,7 @@ MenuStroke.Color = Color3.fromRGB(255, 255, 255)
 MenuStroke.Thickness = 2
 MenuStroke.Parent = MobileMenu
 
--- Helper para crear botones
+-- Función helper para crear botones
 local function createButton(name, text, position, color)
 	local button = Instance.new("TextButton")
 	button.Name = name
@@ -350,6 +442,7 @@ local function createButton(name, text, position, color)
 	return button
 end
 
+-- Crear botones del menú
 local MenuTitle = Instance.new("TextLabel")
 MenuTitle.Size = UDim2.new(1, 0, 0, 40)
 MenuTitle.BackgroundTransparency = 1
@@ -359,10 +452,21 @@ MenuTitle.Font = Enum.Font.GothamBold
 MenuTitle.TextSize = 18
 MenuTitle.Parent = MobileMenu
 
-local ESPButton = createButton("ESPButton", "ESP: OFF", UDim2.new(0.5, -120, 0, 55), Color3.fromRGB(255, 0, 0))
-local AimbotButton = createButton("AimbotButton", "AIMBOT: OFF", UDim2.new(0.5, -120, 0, 115), Color3.fromRGB(255, 0, 0))
-local SpeedButton = createButton("SpeedButton", "SPEED: OFF", UDim2.new(0.5, -120, 0, 175), Color3.fromRGB(255, 0, 0))
-local ServerHopButton = createButton("ServerHopButton", "🔄 CAMBIAR SERVER", UDim2.new(0.5, -120, 0, 295), Color3.fromRGB(100, 100, 255))
+local ESPButton = createButton("ESPButton", enabled and "ESP: ON" or "ESP: OFF", 
+	UDim2.new(0.5, -120, 0, 55), 
+	enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local AimbotButton = createButton("AimbotButton", aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF",
+	UDim2.new(0.5, -120, 0, 115),
+	aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local SpeedButton = createButton("SpeedButton", speedHackEnabled and "SPEED: ON" or "SPEED: OFF",
+	UDim2.new(0.5, -120, 0, 175),
+	speedHackEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+
+local ServerHopButton = createButton("ServerHopButton", "🔄 CAMBIAR SERVER",
+	UDim2.new(0.5, -120, 0, 295),
+	Color3.fromRGB(100, 100, 255))
 
 -- Speed slider
 local SpeedLabel = Instance.new("TextLabel")
@@ -387,7 +491,7 @@ SliderCorner.CornerRadius = UDim.new(0, 5)
 SliderCorner.Parent = SliderBG
 
 local SliderFill = Instance.new("Frame")
-SliderFill.Size = UDim2.new(0, 0, 1, 0)
+SliderFill.Size = UDim2.new((speedValue - config.MIN_SPEED) / (config.MAX_SPEED - config.MIN_SPEED), 0, 1, 0)
 SliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 SliderFill.BorderSizePixel = 0
 SliderFill.Parent = SliderBG
@@ -398,7 +502,7 @@ FillCorner.Parent = SliderFill
 
 local SliderButton = Instance.new("TextButton")
 SliderButton.Size = UDim2.new(0, 20, 0, 20)
-SliderButton.Position = UDim2.new(0, -10, 0.5, -10)
+SliderButton.Position = UDim2.new((speedValue - config.MIN_SPEED) / (config.MAX_SPEED - config.MIN_SPEED), -10, 0.5, -10)
 SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 SliderButton.BorderSizePixel = 0
 SliderButton.Text = ""
@@ -408,7 +512,7 @@ local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(1, 0)
 ButtonCorner.Parent = SliderButton
 
--- ===== TEXTO DE BIENVENIDA =====
+-- Texto de bienvenida
 local WelcomeText = Instance.new("TextLabel")
 WelcomeText.Size = UDim2.new(0, 400, 0, 35)
 WelcomeText.Position = UDim2.new(0.5, -200, 0.85, 0)
@@ -434,7 +538,7 @@ task.spawn(function()
 	WelcomeText.Visible = false
 end)
 
--- ===== STATUS TEXT =====
+-- Status text
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(0, 300, 0, 35)
 StatusText.Position = UDim2.new(0.5, -150, 0.92, 0)
@@ -446,80 +550,9 @@ StatusText.TextSize = 18
 StatusText.Visible = false
 StatusText.Parent = ScreenGui
 
-local StatusCorner = Instance.new("UICorner")
-StatusCorner.CornerRadius = UDim.new(0, 10)
-StatusCorner.Parent = StatusText
-
--- ===== FUNCIONES UTILITARIAS =====
-local lastKillTime = 0
-local function updateKillCounter()
-	KillCount.Text = tostring(killCount)
-	
-	local currentTime = tick()
-	if currentTime - lastKillTime > 0.1 then
-		lastKillTime = currentTime
-		task.spawn(function()
-			KillCount.TextSize = 36
-			KillIcon.TextSize = 32
-			FrameStroke.Transparency = 0
-			
-			task.wait(0.08)
-			
-			KillCount.TextSize = 32
-			KillIcon.TextSize = 28
-			FrameStroke.Transparency = 0.3
-		end)
-	end
-end
-
-local function updateInfoHUD()
-	if not InfoHUD or not InfoHUD.Visible then return end
-	
-	local roundLabel = InfoHUD:FindFirstChild("RoundLabel")
-	local zombiesLabel = InfoHUD:FindFirstChild("ZombiesLabel")
-	local speedLabelHUD = InfoHUD:FindFirstChild("SpeedLabel")
-	local freezeLabel = InfoHUD:FindFirstChild("FreezeLabel")
-	
-	if roundLabel then
-		local roundValue = workspace:FindFirstChild("RoundValue") or workspace:FindFirstChild("Round")
-		roundLabel.Text = (roundValue and roundValue:IsA("IntValue")) and "🎯 RONDA: " .. roundValue.Value or "🎯 RONDA: --"
-	end
-	
-	if zombiesLabel then
-		local baddies = workspace:FindFirstChild("Baddies")
-		local count = baddies and #baddies:GetChildren() or 0
-		zombiesLabel.Text = "💀 ZOMBIES: " .. count
-	end
-	
-	if speedLabelHUD then
-		local char = player.Character
-		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-		local currentSpeed = humanoid and math.floor(humanoid.WalkSpeed) or 16
-		speedLabelHUD.Text = "⚡ VELOCIDAD: " .. currentSpeed
-	end
-	
-	if freezeLabel then
-		if freezeActive then
-			freezeLabel.Text = "❄️ FREEZE: ACTIVO"
-			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 255)
-		elseif freezeCooldown then
-			local timeLeft = math.ceil(freezeCooldownTime - tick())
-			freezeLabel.Text = "❄️ FREEZE: " .. timeLeft .. "s"
-			freezeLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
-		else
-			freezeLabel.Text = "❄️ FREEZE: LISTO"
-			freezeLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
-		end
-	end
-end
-
-local function updateTPSelector()
-	if TPSelectorLabel then
-		TPSelectorLabel.Text = "📍 " .. TPOptions[currentTPOption]
-	end
-end
-
+-- ===== FUNCIONES OPTIMIZADAS =====
 local function showStatus(text, color)
+	if not StatusText then return end
 	StatusText.Text = text
 	StatusText.TextColor3 = color
 	StatusText.Visible = true
@@ -530,7 +563,6 @@ local function showStatus(text, color)
 		for i = 0, 30 do
 			if StatusText then
 				StatusText.TextTransparency = i / 30
-				StatusText.BackgroundTransparency = 0.5 + (0.5 * (i / 30))
 				task.wait(0.033)
 			end
 		end
@@ -538,7 +570,6 @@ local function showStatus(text, color)
 	end)
 end
 
--- ===== FUNCIONES VIP =====
 local function cycleTPOption()
 	currentTPOption = currentTPOption % #TPOptions + 1
 	updateTPSelector()
@@ -554,7 +585,7 @@ local function executeTP()
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	if not hrp then
-		showStatus("❌ No se encontró personaje", Color3.fromRGB(255, 0, 0))
+		showStatus("❌ No se encontró tu personaje", Color3.fromRGB(255, 0, 0))
 		return
 	end
 
@@ -577,88 +608,6 @@ local function executeTP()
 		hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 5)
 		showStatus("✅ TP a " .. targetName, Color3.fromRGB(0, 255, 0))
 	end
-end
-
-local function freezeZombies()
-	if not isVIP then
-		showStatus("❌ FREEZE es solo VIP", Color3.fromRGB(255, 0, 0))
-		return
-	end
-	
-	if freezeCooldown then
-		local timeLeft = math.ceil(freezeCooldownTime - tick())
-		showStatus("❄️ Cooldown: " .. timeLeft .. "s", Color3.fromRGB(255, 150, 100))
-		return
-	end
-	
-	if freezeActive then
-		showStatus("❄️ Freeze ya está activo", Color3.fromRGB(100, 200, 255))
-		return
-	end
-	
-	local baddies = workspace:FindFirstChild("Baddies")
-	if not baddies then
-		showStatus("❌ No hay zombies", Color3.fromRGB(255, 0, 0))
-		return
-	end
-	
-	freezeActive = true
-	local frozenCount = 0
-	
-	for _, zombie in ipairs(baddies:GetChildren()) do
-		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
-		if humanoid and humanoid.Health > 0 then
-			frozenZombies[zombie] = humanoid.WalkSpeed
-			humanoid.WalkSpeed = 0
-			humanoid.JumpPower = 0
-			
-			for _, part in ipairs(zombie:GetChildren()) do
-				if part:IsA("BasePart") then
-					local ice = Instance.new("SelectionBox")
-					ice.Name = "IceEffect"
-					ice.Adornee = part
-					ice.LineThickness = 0.05
-					ice.Color3 = Color3.fromRGB(100, 200, 255)
-					ice.Parent = part
-				end
-			end
-			
-			frozenCount = frozenCount + 1
-		end
-	end
-	
-	showStatus("❄️ " .. frozenCount .. " ZOMBIES CONGELADOS", Color3.fromRGB(100, 255, 255))
-	
-	task.delay(config.FREEZE_DURATION, function()
-		for zombie, originalSpeed in pairs(frozenZombies) do
-			if zombie and zombie.Parent then
-				local humanoid = zombie:FindFirstChildOfClass("Humanoid")
-				if humanoid then
-					humanoid.WalkSpeed = originalSpeed
-					humanoid.JumpPower = 50
-				end
-				
-				for _, part in ipairs(zombie:GetChildren()) do
-					if part:IsA("BasePart") then
-						local ice = part:FindFirstChild("IceEffect")
-						if ice then ice:Destroy() end
-					end
-				end
-			end
-		end
-		
-		table.clear(frozenZombies)
-		freezeActive = false
-		showStatus("🔥 Zombies descongelados", Color3.fromRGB(255, 150, 100))
-		
-		freezeCooldown = true
-		freezeCooldownTime = tick() + config.FREEZE_COOLDOWN
-		
-		task.delay(config.FREEZE_COOLDOWN, function()
-			freezeCooldown = false
-			showStatus("❄️ Freeze listo", Color3.fromRGB(100, 255, 150))
-		end)
-	end)
 end
 
 local function serverHop()
@@ -685,14 +634,14 @@ local function serverHop()
 	end)
 end
 
--- ===== ESP SYSTEM =====
+-- ===== ESP OPTIMIZADO CON DISTANCIA =====
 local function getDistanceColor(distance)
 	if distance > 30 then
-		return Color3.fromRGB(0, 255, 0)
+		return Color3.fromRGB(0, 255, 0) -- Verde = Lejos
 	elseif distance > 15 then
-		return Color3.fromRGB(255, 255, 0)
+		return Color3.fromRGB(255, 255, 0) -- Amarillo = Medio
 	else
-		return Color3.fromRGB(255, 0, 0)
+		return Color3.fromRGB(255, 0, 0) -- Rojo = Cerca
 	end
 end
 
@@ -746,6 +695,7 @@ local function createZombieESP(zombie)
 		end
 	end
 	
+	-- Agregar label de distancia
 	addDistanceLabel(zombie)
 end
 
@@ -760,10 +710,11 @@ local function createBoxESP(box)
 	end
 end
 
+-- Actualizar colores de ESP según distancia
 local lastESPUpdate = 0
 local function updateESPColors()
 	local currentTime = tick()
-	if currentTime - lastESPUpdate < config.ESP_UPDATE_RATE then return end
+	if currentTime - lastESPUpdate < 0.5 then return end
 	lastESPUpdate = currentTime
 	
 	local char = player.Character
@@ -781,6 +732,7 @@ local function updateESPColors()
 			local distance = (hrp.Position - zombieHRP.Position).Magnitude
 			local color = getDistanceColor(distance)
 			
+			-- Actualizar color del ESP
 			for _, part in ipairs(zombie:GetChildren()) do
 				if part:IsA("BasePart") then
 					local highlight = part:FindFirstChild("ESP_Highlight")
@@ -790,6 +742,7 @@ local function updateESPColors()
 				end
 			end
 			
+			-- Actualizar texto de distancia
 			local distanceGUI = head:FindFirstChild("ESP_Distance")
 			if distanceGUI then
 				local textLabel = distanceGUI:FindFirstChildOfClass("TextLabel")
@@ -834,7 +787,100 @@ local function enableESP()
 	end
 end
 
--- ===== KILL COUNTER =====
+-- ===== ZOMBIE FREEZE SYSTEM (VIP) =====
+local frozenZombies = {}
+
+local function freezeZombies()
+	if not isVIP then
+		showStatus("❌ FREEZE es solo VIP", Color3.fromRGB(255, 0, 0))
+		return
+	end
+	
+	if freezeCooldown then
+		local timeLeft = math.ceil(freezeCooldownTime - tick())
+		showStatus("❄️ Cooldown: " .. timeLeft .. "s", Color3.fromRGB(255, 150, 100))
+		return
+	end
+	
+	if freezeActive then
+		showStatus("❄️ Freeze ya está activo", Color3.fromRGB(100, 200, 255))
+		return
+	end
+	
+	local baddies = workspace:FindFirstChild("Baddies")
+	if not baddies then
+		showStatus("❌ No hay zombies", Color3.fromRGB(255, 0, 0))
+		return
+	end
+	
+	freezeActive = true
+	local frozenCount = 0
+	
+	-- Congelar todos los zombies
+	for _, zombie in ipairs(baddies:GetChildren()) do
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			-- Guardar velocidad original
+			frozenZombies[zombie] = humanoid.WalkSpeed
+			
+			-- Congelar
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+			
+			-- Efecto visual de hielo
+			for _, part in ipairs(zombie:GetChildren()) do
+				if part:IsA("BasePart") then
+					local ice = Instance.new("SelectionBox")
+					ice.Name = "IceEffect"
+					ice.Adornee = part
+					ice.LineThickness = 0.05
+					ice.Color3 = Color3.fromRGB(100, 200, 255)
+					ice.Parent = part
+				end
+			end
+			
+			frozenCount = frozenCount + 1
+		end
+	end
+	
+	showStatus("❄️ " .. frozenCount .. " ZOMBIES CONGELADOS", Color3.fromRGB(100, 255, 255))
+	
+	-- Descongelar después de 5 segundos
+	task.delay(config.FREEZE_DURATION, function()
+		for zombie, originalSpeed in pairs(frozenZombies) do
+			if zombie and zombie.Parent then
+				local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					humanoid.WalkSpeed = originalSpeed
+					humanoid.JumpPower = 50
+				end
+				
+				-- Remover efecto visual
+				for _, part in ipairs(zombie:GetChildren()) do
+					if part:IsA("BasePart") then
+						local ice = part:FindFirstChild("IceEffect")
+						if ice then ice:Destroy() end
+					end
+				end
+			end
+		end
+		
+		table.clear(frozenZombies)
+		freezeActive = false
+		showStatus("🔥 Zombies descongelados", Color3.fromRGB(255, 150, 100))
+		
+		-- Iniciar cooldown
+		freezeCooldown = true
+		freezeCooldownTime = tick() + config.FREEZE_COOLDOWN
+		
+		task.delay(config.FREEZE_COOLDOWN, function()
+			freezeCooldown = false
+			showStatus("❄️ Freeze listo de nuevo", Color3.fromRGB(100, 255, 150))
+		end)
+	end)
+end
+
+-- ===== KILL COUNTER SYSTEM OPTIMIZADO =====
 local function setupKillCounter()
 	local baddies = workspace:FindFirstChild("Baddies")
 	if not baddies then return end
@@ -862,7 +908,7 @@ local function setupKillCounter()
 	end)
 end
 
--- ===== SPEED HACK =====
+-- ===== SPEED HACK OPTIMIZADO =====
 local function applySpeed()
 	local char = player.Character
 	if char then
@@ -919,7 +965,7 @@ local function updateSlider(value)
 	if speedHackEnabled then applySpeed() end
 end
 
--- Slider dragging
+-- Slider dragging optimizado
 local sliderDragging = false
 
 SliderButton.InputBegan:Connect(function(input)
@@ -948,7 +994,7 @@ SliderBG.InputBegan:Connect(function(input)
 	end
 end)
 
--- ===== AIMBOT =====
+-- ===== AIMBOT OPTIMIZADO =====
 local function getClosestZombieToCursor()
 	local shortest = math.huge
 	local closest = nil
@@ -1008,12 +1054,6 @@ local function toggleESP(fromKeyboard)
 		ESPButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 		ESPButton.Text = "ESP: OFF"
 	end
-	
-	-- Disconnect old zombie connection
-	if connections.zombieAdded then
-		connections.zombieAdded:Disconnect()
-		connections.zombieAdded = nil
-	end
 end
 
 local function toggleAimbot()
@@ -1042,26 +1082,25 @@ AimbotButton.MouseButton1Click:Connect(function() toggleAimbot() end)
 SpeedButton.MouseButton1Click:Connect(function() toggleSpeedHack() end)
 ServerHopButton.MouseButton1Click:Connect(function() serverHop() end)
 
--- ===== BUCLE PRINCIPAL =====
+-- ===== BUCLE PRINCIPAL OPTIMIZADO =====
 local lastAlertCheck = 0
 local lastHUDUpdate = 0
-
 connections.render = RunService.RenderStepped:Connect(function()
 	local currentTime = tick()
 	
-	-- Actualizar Info HUD
-	if isVIP and InfoHUD and InfoHUD.Visible and currentTime - lastHUDUpdate > config.HUD_UPDATE_RATE then
+	-- Actualizar Info HUD (cada 0.5 segundos)
+	if isVIP and InfoHUD and InfoHUD.Visible and currentTime - lastHUDUpdate > 0.5 then
 		lastHUDUpdate = currentTime
 		updateInfoHUD()
 	end
 	
-	-- Actualizar colores ESP
+	-- Actualizar colores ESP según distancia
 	if enabled then
 		updateESPColors()
 	end
 	
-	-- Alerta zombies
-	if enabled and currentTime - lastAlertCheck > config.ALERT_UPDATE_RATE then
+	-- Alerta zombies (cada 0.2 segundos)
+	if enabled and currentTime - lastAlertCheck > 0.2 then
 		lastAlertCheck = currentTime
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1158,8 +1197,6 @@ local function cleanup()
 		if conn then pcall(function() conn:Disconnect() end) end
 	end
 	clearAll()
-	if ScreenGui then ScreenGui:Destroy() end
-	_G.ESP_ZOMBIES_LOADED = nil
 end
 
 Players.PlayerRemoving:Connect(function(plr)
@@ -1169,7 +1206,7 @@ end)
 -- ===== INICIALIZACIÓN =====
 setupKillCounter()
 
-print("✅ ESP Script OPTIMIZADO V2 cargado!")
+print("✅ ESP Script OPTIMIZADO cargado!")
 print("📌 T = ESP con Distancia | C = Aimbot | E = Speed | H = Server Hop")
 print("📌 K = Velocidad+ | L = Velocidad-")
 if isVIP then
@@ -1181,4 +1218,4 @@ if isVIP then
 	print("👑 VIP ACTIVO | ID: " .. player.UserId)
 else
 	print("📌 M = Verificar VIP")
-end
+endv
