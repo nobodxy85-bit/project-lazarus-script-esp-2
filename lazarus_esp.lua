@@ -26,7 +26,7 @@ local config = {
 	MAX_SPEED = 200,
 	SPEED_INCREMENT = 5,
 	FREEZE_DURATION = 5,
-	FREEZE_COOLDOWN = 15
+	FREEZE_COOLDOWN = 0
 }
 
 local enabled = false
