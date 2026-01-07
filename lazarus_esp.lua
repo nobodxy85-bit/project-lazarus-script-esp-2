@@ -2,12 +2,6 @@
 -- Creator = Nobodxy85-bit
 -- Versión sin noclip y sin persistencia
 
-if _G.ESP_ZOMBIES_LOADED then
-	warn("⚠️ ESP Script ya está cargado")
-	return
-end
-_G.ESP_ZOMBIES_LOADED = true
-
 -- ===== VIP SYSTEM =====
 local VIP_USER_IDS = {
 	10214014023
@@ -1218,4 +1212,4 @@ if isVIP then
 	print("👑 VIP ACTIVO | ID: " .. player.UserId)
 else
 	print("📌 M = Verificar VIP")
-endv
+end
